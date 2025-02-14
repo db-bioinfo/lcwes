@@ -55,7 +55,7 @@ gatk HaplotypeCaller \
 	-I ${sample}_aligned_marked.bam \
 	-O ${sample}_variants.vcf.gz \
 	-L $TARGETS \
-	--native-pair-hmm-threads 5
+	--native-pair-hmm-threads 32
 
 ###########################################################
 
@@ -163,9 +163,9 @@ rm ${sample}_vep.vcf*
 # spilit mulitallelic sites
 
 echo "Split multiallelic sites"
-bcftools norm --threads 5 -m "-any" ${sample}_vep.int2chr.vcf | \
+bcftools norm --threads 32 -m "-any" ${sample}_vep.int2chr.vcf | \
 vt normalize - -n -r $REF_GENOME | \
-bgzip -@ 5 -c > ${sample}_vep.int2chr.norm.vcf.gz  && \
+bgzip -@ 32 -c > ${sample}_vep.int2chr.norm.vcf.gz  && \
 tabix ${sample}_vep.int2chr.norm.vcf.gz
 
 rm ${sample}_vep.int2chr.vcf
