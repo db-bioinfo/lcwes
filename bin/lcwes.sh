@@ -31,7 +31,7 @@ echo "Processing sample: $sample"
 # Alignment
 bwa mem -R "@RG\tID:${sample}\tLB:solid_lib\tPL:SOLID\tPU:unit1\tSM:${sample}" -t 32 \
 	$REF_GENOME $fastq1 $fastq2 | \
-	samtools view -@ 32 -bS -q 20 | \
+	samtools view -@ 32 -bS | \
 	samtools sort -@ 32 -o ${sample}_aligned_rg.bam
 
 # Mark Dublicates
@@ -54,7 +54,8 @@ gatk HaplotypeCaller \
 	-R $REF_GENOME_dict \
 	-I ${sample}_aligned_marked.bam \
 	-O ${sample}_variants.vcf.gz \
-	--native-pair-hmm-threads 32
+	-L $TARGETS \
+	--native-pair-hmm-threads 5
 
 ###########################################################
 
@@ -107,7 +108,7 @@ rm ${sample}_snps.filtered.vcf.gz* ${sample}_indels.filtered.vcf.gz*
 ###########################################################
 
 # Convert vcf compatible to ensemble (chr1->1)
-python lcchr2int.v1.0.1.py ${sample}_variants.filtered.vcf.gz ${sample}_variants.filtered.chr2int.vcf.gz
+python lcchr2int.py ${sample}_variants.filtered.vcf.gz ${sample}_variants.filtered.chr2int.vcf.gz
 
 gunzip ${sample}_variants.filtered.chr2int.vcf.gz
 
@@ -153,7 +154,7 @@ rm ${sample}_variants.filtered.chr2int.vcf
 ###########################################################
 
 # Convert back to original (1 -> chr1)
-python lcint2chr.v1.0.1.py ${sample}_vep.vcf ${sample}_vep.int2chr.vcf
+python lcint2chr.py ${sample}_vep.vcf ${sample}_vep.int2chr.vcf
 
 #############gunzip ${sample}_vep.int2chr.vcf.gz
 
@@ -162,9 +163,9 @@ rm ${sample}_vep.vcf*
 # spilit mulitallelic sites
 
 echo "Split multiallelic sites"
-bcftools norm --threads 32 -m "-any" ${sample}_vep.int2chr.vcf | \
+bcftools norm --threads 5 -m "-any" ${sample}_vep.int2chr.vcf | \
 vt normalize - -n -r $REF_GENOME | \
-bgzip -@ 32 -c > ${sample}_vep.int2chr.norm.vcf.gz  && \
+bgzip -@ 5 -c > ${sample}_vep.int2chr.norm.vcf.gz  && \
 tabix ${sample}_vep.int2chr.norm.vcf.gz
 
 rm ${sample}_vep.int2chr.vcf
