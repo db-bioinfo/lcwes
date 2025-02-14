@@ -29,7 +29,7 @@ process_sample() {
 echo "Processing sample: $sample"
 
 # Alignment
-bwa mem -R "@RG\tID:${sample}\tLB:solid_lib\tPL:SOLID\tPU:unit1\tSM:${sample}" -t 32 \
+bwa mem -R "@RG\tID:${sample}\tLB:lib1\tPL:ILLUMINA\tPU:unit1\tSM:${sample}" -t 32 \
 	$REF_GENOME $fastq1 $fastq2 | \
 	samtools view -@ 32 -bS | \
 	samtools sort -@ 32 -o ${sample}_aligned_rg.bam
