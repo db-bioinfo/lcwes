@@ -4,9 +4,9 @@
 FASTQ_DIR="."
 
 # Set paths to required tools and reference files
-BWA_INDEX="/home/administrator/lifecode/genomes/bwa_hg19_noalt"
-REF_GENOME="/home/administrator/lifecode/genomes/bwa_hg19_noalt/hg19.noalt.fa"
-REF_GENOME_dict="/home/administrator/lifecode/genomes/Picard_SDict/hg19_noalt/hg19.noalt.fa"
+BWA_INDEX="/home/administrator/lifecode/genomes/bwa_hg19"
+REF_GENOME="/home/administrator/lifecode/genomes/bwa_hg19/hg19.fa"
+REF_GENOME_dict="/home/administrator/lifecode/genomes/Picard_SDict/hg19/hg19.fa"
 TARGETS="/home/administrator/lifecode/genomes/bed_files/WES_HG19/S33266340_Covered.adj.bed"
 VEP_CACHEDIR="/home/administrator/.vep/104_GRCh37/"
 VEP_GENOME="/home/administrator/.vep/104_GRCh37/homo_sapiens/104_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa.gz"
@@ -14,11 +14,11 @@ HUMANDB="/home/administrator/lifecode/genomes/intervar_humandb/humandb"
 INTERVAR="/home/administrator/lifecode/genomes/intervar_humandb/intervar"
 GNOMAD_LATEST="/home/administrator/lifecode/genomes/intervar_humandb/humandb/gnomad"
 AUTOPVS1="/home/administrator/D3b-autoPVS1"
-CLNVAR="home/administrator/lifecode/genomes/AutoGVP_data/clinvar.vcf.gz"
-CLNVAR_PUB="/home/administrator/lifecode/genomes/AutoGVP_data/ClinVar-selected-submissions.tsv"
-VARIANT_SUM="/home/administrator/lifecode/genomes/AutoGVP_data/variant_summary.txt.gz"
-SUB_SUM="/home/administrator/lifecode/genomes/AutoGVP_data/submission_summary.txt.gz"
-CLN_IDS="/home/administrator/lifecode/genomes/AutoGVP_data/clinvar_cpg_concept_ids.txt"
+CLNVAR="/home/administrator/lifecode/genomes/AutoGVP_data/most_severe/clinvar.vcf.gz"
+CLNVAR_PUB="/home/administrator/lifecode/genomes/AutoGVP_data/most_severe/ClinVar-selected-submissions.tsv"
+VARIANT_SUM="/home/administrator/lifecode/genomes/AutoGVP_data/most_severe/variant_summary.txt.gz"
+SUB_SUM="/home/administrator/lifecode/genomes/AutoGVP_data/most_severe/submission_summary.txt.gz"
+CLN_IDS="/home/administrator/lifecode/genomes/AutoGVP_data/most_severe/clinvar_cpg_concept_ids.txt"
 
 # Function to process a single sample
 process_sample() {
@@ -29,7 +29,7 @@ process_sample() {
 echo "Processing sample: $sample"
 
 # Alignment
-bwa mem -R "@RG\tID:${sample}\tLB:lib1\tPL:ILLUMINA\tPU:unit1\tSM:${sample}" -t 32 \
+bwa mem -R "@RG\tID:${sample}\tLB:lib1\tPL:MGISEQ\tPU:unit1\tSM:${sample}" -t 32 \
 	$REF_GENOME $fastq1 $fastq2 | \
 	samtools view -@ 32 -bS | \
 	samtools sort -@ 32 -o ${sample}_aligned_rg.bam
@@ -54,7 +54,9 @@ gatk HaplotypeCaller \
 	-R $REF_GENOME_dict \
 	-I ${sample}_aligned_marked.bam \
 	-O ${sample}_variants.vcf.gz \
-	-L $TARGETS \
+	--max-alternate-alleles 1 \
+	--pcr-indel-model NONE \
+	--dont-use-soft-clipped-bases \
 	--native-pair-hmm-threads 32
 
 ###########################################################
