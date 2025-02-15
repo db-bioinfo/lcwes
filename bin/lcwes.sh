@@ -222,24 +222,24 @@ cd $my_dir
 
 # Run AutoGVP
 gunzip ${sample}_vep.int2chr.norm.vcf.gz
-ln -s /home/administrator/lifecode/genomes/AutoGVP_data/* .
+#ln -s /home/administrator/lifecode/genomes/AutoGVP_data/* .
 mkdir results
 
 echo "Running AutoGVP"
 conda run -n bcftools_1.17 run_autogvp.sh \
 	--workflow="custom" \
 	--vcf=${sample}_vep.int2chr.norm.vcf \
-	--clinvar=clinvar.vcf.gz \
+	--clinvar=$CLNVAR \
 	--intervar=${sample}_vep.int2chr.norm.intervar.vcf.hg19_multianno.txt.intervar \
 	--multianno=${sample}_vep.int2chr.norm.anno.hg19_multianno.txt \
 	--autopvs1=${sample}_PVS1.txt \
 	--outdir=results \
 	--out="${sample}" \
-	--selected_clinvar_submissions=ClinVar-selected-submissions.tsv \
-	--variant_summary=variant_summary.txt.gz \
-	--submission_summary=submission_summary.txt.gz \
-	--conceptIDs=clinvar_cpg_concept_ids.txt \
-	--conflict_res="latest"
+	--selected_clinvar_submissions=$CLNVAR_PUB \
+	--variant_summary=$VARIANT_SUM \
+	--submission_summary=$SUB_SUM \
+	--conceptIDs=$CLN_IDS \
+	--conflict_res="most_severe"
 
 ###########################################################
 
