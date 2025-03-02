@@ -3,7 +3,7 @@ import jinja2
 import os
 import sys
 from datetime import datetime
-import json
+import re
 
 class ClinicalReportGenerator:
     def __init__(self):
@@ -250,25 +250,21 @@ class ClinicalReportGenerator:
             table-layout: fixed;
         }
 
-        .col-chr { width: 55px; }
-        .col-pos { width: 80px; }
-        .col-ref { width: 45px; }
-        .col-alt { width: 45px; }
+        .col-variant { width: 140px; }
         .col-gene { width: 70px; }
-        .col-location { width: 100px; }
         .col-dbsnp { width: 90px; }
         .col-cosmic { width: 90px; }
-        .col-transcript { width: 100px; }
-        .col-clnhgvs { width: 100px; }
-        .col-filter { width: 70px; }
+        .col-location { width: 100px; }
+        .col-effect { width: 120px; }
+        .col-clnhgvs { width: 110px; }
+        .col-quality { width: 70px; }
         .col-significance { width: 150px; }
         .col-acmg-class { width: 150px; }
         .col-acmg-criteria { width: 150px; }
         .col-database { width: 90px; }
-        .col-af { width: 60px; text-align: right; }
         .col-gnomad-af { width: 80px; text-align: right; }
         .col-depth { width: 80px; text-align: right; }
-        .col-disease { width: 100px; }
+        .col-disease { width: 120px; }
 
         .not-available {
             color: #666;
@@ -500,47 +496,39 @@ class ClinicalReportGenerator:
                 <table class="variants-table" id="variantsTable">
                     <thead>
                         <tr>
-                            <th class="col-chr" data-sort="chr">Chr</th>
-                            <th class="col-pos" data-sort="pos">Position</th>
-                            <th class="col-ref" data-sort="ref">Ref</th>
-                            <th class="col-alt" data-sort="alt">Alt</th>
+                            <th class="col-variant" data-sort="variant">Variant</th>
                             <th class="col-gene" data-sort="gene">Gene</th>
-                            <th class="col-location" data-sort="location">Location</th>
                             <th class="col-dbsnp" data-sort="dbsnp">dbSNP ID</th>
                             <th class="col-cosmic" data-sort="cosmic">COSMIC</th>
-                            <th class="col-transcript" data-sort="transcript">Transcript</th>
+                            <th class="col-location" data-sort="location">Location</th>
+                            <th class="col-effect" data-sort="effect">Effect</th>
                             <th class="col-clnhgvs" data-sort="clnhgvs">CLNHGVS</th>
-                            <th class="col-filter" data-sort="filter">Filter</th>
+                            <th class="col-quality" data-sort="quality">Quality</th>
                             <th class="col-significance" data-sort="significance">Clinical Significance</th>
                             <th class="col-acmg-class" data-sort="acmg">ACMG Classification</th>
                             <th class="col-acmg-criteria" data-sort="criteria">ACMG Met Criteria</th>
                             <th class="col-database" data-sort="database">Database</th>
-                            <th class="col-af" data-sort="af">AF</th>
-                            <th class="col-gnomad-af" data-sort="gnomad">P-AF</th>
-                            <th class="col-depth" data-sort="depth">Depth</th>
+                            <th class="col-gnomad-af" data-sort="gnomad">gnomAD AF</th>
                             <th class="col-disease" data-sort="disease">Disease</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for variant in variants %}
                         <tr>
-                            <td class="col-chr">{{ variant.CHROM }}</td>
-                            <td class="col-pos">{{ variant.POS }}</td>
-                            <td class="col-ref">{{ variant.REF }}</td>
-                            <td class="col-alt">{{ variant.ALT }}</td>
+                            <td class="col-variant">{{ variant.Variant }}</td>
                             <td class="col-gene">
                                 <a href="https://www.genecards.org/cgi-bin/carddisp.pl?gene={{ variant.Gene }}" 
                                    class="gene-link" target="_blank" 
                                    title="View {{ variant.Gene }} in GeneCards">{{ variant.Gene }}</a>
                             </td>
-                            <td class="col-location">{{ variant.Location }}</td>
                             <td class="col-dbsnp">{{ variant.dbSNP_ID }}</td>
                             <td class="col-cosmic">{{ variant.COSMIC_ID }}</td>
-                            <td class="col-transcript">{{ variant.Transcript }}</td>
+                            <td class="col-location">{{ variant.Location }}</td>
+                            <td class="col-effect">{{ variant.Effect }}</td>
                             <td class="col-clnhgvs">{{ variant.CLNHGVS }}</td>
-                            <td class="col-filter" title="{{ variant.FILTER }}">
-                                <span class="{{ variant.filter_class }}">
-                                    {{ variant.FILTER }}
+                            <td class="col-quality" title="{{ variant.Quality }}">
+                                <span class="{{ variant.quality_class }}">
+                                    {{ variant.Quality }}
                                 </span>
                             </td>
                             <td class="col-significance">
@@ -570,22 +558,12 @@ class ClinicalReportGenerator:
                                     </div>
                                 </div>
                             </td>
-                            <td class="col-af">
-                                {% if variant.AF_formatted != "N/A" %}
-                                    {{ variant.AF_formatted }}
-                                {% else %}
-                                    <span class="not-available">Not Available</span>
-                                {% endif %}
-                            </td>
                             <td class="col-gnomad-af">
                                 {% if variant.gnomAD_AF_formatted != "N/A" %}
                                     {{ variant.gnomAD_AF_formatted }}
                                 {% else %}
                                     <span class="not-available">Not Available</span>
                                 {% endif %}
-                            </td>
-                            <td class="col-depth" {% if variant.Depth < 20 %}class="depth-warning"{% endif %}>
-                                {{ variant.Depth }}
                             </td>
                             <td class="col-disease">{{ variant.Disease }}</td>
                         </tr>
@@ -595,7 +573,7 @@ class ClinicalReportGenerator:
             </div>
             
             <div class="footer">
-                <p>This report contains the top 300 prioritized variants. For full results, please refer to the complete Excel report.</p>
+                <p>This report contains the top 300 prioritized variants. For full results, please refer to the complete data file.</p>
                 <p><small>Tip: Sort columns by clicking headers. Priority sorting implemented for pathogenicity.</small></p>
             </div>
         </div>
@@ -639,24 +617,19 @@ class ClinicalReportGenerator:
             const columnToggle = document.getElementById('columnToggle');
             const table = document.getElementById('variantsTable');
             const columns = [
-                {name: 'Chr', class: 'col-chr'},
-                {name: 'Position', class: 'col-pos'},
-                {name: 'Ref', class: 'col-ref'},
-                {name: 'Alt', class: 'col-alt'},
+                {name: 'Variant', class: 'col-variant'},
                 {name: 'Gene', class: 'col-gene'},
-                {name: 'Location', class: 'col-location'},
                 {name: 'dbSNP ID', class: 'col-dbsnp'},
                 {name: 'COSMIC', class: 'col-cosmic'},
-                {name: 'Transcript', class: 'col-transcript'},
+                {name: 'Location', class: 'col-location'},
+                {name: 'Effect', class: 'col-effect'},
                 {name: 'CLNHGVS', class: 'col-clnhgvs'},
-                {name: 'Filter', class: 'col-filter'},
+                {name: 'Quality', class: 'col-quality'},
                 {name: 'Clinical Significance', class: 'col-significance'},
                 {name: 'ACMG Classification', class: 'col-acmg-class'},
                 {name: 'ACMG Met Criteria', class: 'col-acmg-criteria'},
                 {name: 'Database', class: 'col-database'},
-                {name: 'Sample AF', class: 'col-af'},
-                {name: 'Population AF', class: 'col-gnomad-af'},
-                {name: 'Depth', class: 'col-depth'},
+                {name: 'gnomAD AF', class: 'col-gnomad-af'},
                 {name: 'Disease', class: 'col-disease'}
             ];
 
@@ -765,15 +738,9 @@ class ClinicalReportGenerator:
                         return currentSort.ascending ? aVal - bVal : bVal - aVal;
                     }
                     
-                    if (column === 'pos' || column === 'depth') {
-                        const aVal = parseInt(a.querySelector(`.col-${column}`).textContent);
-                        const bVal = parseInt(b.querySelector(`.col-${column}`).textContent);
-                        return currentSort.ascending ? aVal - bVal : bVal - aVal;
-                    }
-                    
-                    if (column === 'af' || column === 'gnomad') {
-                        const aText = a.querySelector(`.col-${column}`).textContent;
-                        const bText = b.querySelector(`.col-${column}`).textContent;
+                    if (column === 'gnomad') {
+                        const aText = a.querySelector(`.col-${column}-af`).textContent;
+                        const bText = b.querySelector(`.col-${column}-af`).textContent;
                         const aVal = parseNumericValue(aText);
                         const bVal = parseNumericValue(bText);
                         
@@ -812,16 +779,17 @@ class ClinicalReportGenerator:
         """Determine CSS class based on clinical significance."""
         if pd.isna(significance):
             return 'unknown'
+        
         significance = str(significance).lower()
         if 'conflicting' in significance:
             return 'conflicting'
         elif 'pathogenic' in significance and 'likely' not in significance:
             return 'pathogenic'
-        elif 'likely_pathogenic' in significance:
+        elif 'likely_pathogenic' in significance or 'likely pathogenic' in significance:
             return 'likely-pathogenic'
-        elif 'uncertain_significance' in significance:
+        elif 'uncertain_significance' in significance or 'uncertain significance' in significance:
             return 'uncertain'
-        elif 'likely_benign' in significance:
+        elif 'likely_benign' in significance or 'likely benign' in significance:
             return 'likely-benign'
         elif 'benign' in significance:
             return 'benign'
@@ -831,6 +799,7 @@ class ClinicalReportGenerator:
         """Determine CSS class based on ACMG classification."""
         if pd.isna(classification):
             return 'unknown'
+        
         classification = str(classification).lower()
         if 'pathogenic' in classification and 'likely' not in classification:
             return 'acmg-pathogenic'
@@ -844,64 +813,75 @@ class ClinicalReportGenerator:
             return 'acmg-benign'
         return 'unknown'
 
-    def clean_transcript_notation(self, transcript):
-        """Clean transcript notation by removing special characters."""
-        if pd.isna(transcript):
-            return ""
-        return str(transcript).replace('*', '')
-
-    def get_database_links(self, gene, variant):
-        """Generate database links for a given gene and variant."""
-        chrom = str(variant.get('CHROM', '')).replace('chr', '')
-        pos = str(variant.get('POS', ''))
-        ref = str(variant.get('REF', ''))
-        alt = str(variant.get('ALT', ''))
-        variant_str = f"chr{chrom}-{pos}-{ref}-{alt}-hg19"
-        hgvs_g = f"{variant.get('CHROM')}:g.{pos}{ref}>{alt}"
-        
-        # Determine ClinVar term priority: CLNHGVS > dbSNP ID > transcript
-        clinvar_term = None
-        if variant.get('CLNHGVS') and not pd.isna(variant.get('CLNHGVS')):
-            clinvar_term = variant['CLNHGVS']
-        elif variant.get('dbSNP_ID') and not pd.isna(variant.get('dbSNP_ID')) and variant['dbSNP_ID'] != 'Novel':
-            clinvar_term = variant['dbSNP_ID']
-        else:
-            transcript = self.clean_transcript_notation(variant.get('Transcript', ''))
-            if transcript:
-                clinvar_term = transcript
-
-        # Create database links including COSMIC
-        links = {
-            'ClinVar': f"https://www.ncbi.nlm.nih.gov/clinvar/?term={clinvar_term}" if clinvar_term else "#",
-            'Franklin': f"https://franklin.genoox.com/clinical-db/variant/snp/{variant_str}",
-            'Varsome': f"https://varsome.com/variant/hg19/{variant.get('dbSNP_ID') if variant.get('dbSNP_ID') and variant.get('dbSNP_ID') != 'Novel' else variant_str}?annotation-mode=germline",
-            'OncoKB': f"https://www.oncokb.org/hgvsg/{hgvs_g}?refGenome=GRCh37"
-        }
-        
-        # Add COSMIC link if COSMIC_ID exists
-        if variant.get('COSMIC_ID') and not pd.isna(variant.get('COSMIC_ID')):
-            cosmic_id = str(variant['COSMIC_ID']).replace('COSM', '')  # Remove 'COSM' prefix if present
-            links['COSMIC'] = f"https://cancer.sanger.ac.uk/cosmic/mutation/overview?id={cosmic_id}"
-        
-        return links
-
-    def get_filter_class(self, filter_value):
-        """Determine CSS class based on FILTER value."""
-        if pd.isna(filter_value):
+    def get_quality_class(self, quality):
+        """Determine CSS class based on quality value."""
+        if pd.isna(quality):
             return 'filter-fail'
-        return 'filter-pass' if filter_value == 'PASS' else 'filter-fail'
+        return 'filter-pass' if quality == 'PASS' else 'filter-fail'
 
     def format_af(self, af_value):
         """Format allele frequency value."""
         try:
-            if pd.isna(af_value):
+            if pd.isna(af_value) or af_value == '.':
                 return "N/A"
-            af = float(af_value)
+            
+            # Handle scientific notation
+            if isinstance(af_value, str) and 'e' in af_value.lower():
+                af = float(af_value)
+            else:
+                af = float(af_value)
+                
             if af == 0:
                 return "0.0000"
             return f"{af:.4f}"
         except (ValueError, TypeError):
             return "N/A"
+
+    def get_database_links(self, gene, variant_dict):
+        """Generate database links for a given gene and variant."""
+        # Extract necessary components from variant information
+        chrom = variant_dict.get('Chr', '').replace('chr', '')
+        pos = str(variant_dict.get('Start', ''))
+        ref = variant_dict.get('Ref', '')
+        alt = variant_dict.get('Alt', '')
+        variant_str = f"chr{chrom}-{pos}-{ref}-{alt}-hg19"
+        hgvs_g = f"{variant_dict.get('Chr')}:g.{pos}{ref}>{alt}"
+        
+        # Determine ClinVar term priority: CLNHGVS > dbSNP ID
+        clinvar_term = None
+        if variant_dict.get('CLNHGVS') and not pd.isna(variant_dict.get('CLNHGVS')):
+            clinvar_term = variant_dict['CLNHGVS']
+        elif variant_dict.get('rs') and not pd.isna(variant_dict.get('rs')) and variant_dict['rs'] != '.':
+            clinvar_term = variant_dict['rs']
+        
+        # Create database links
+        links = {
+            'ClinVar': f"https://www.ncbi.nlm.nih.gov/clinvar/?term={clinvar_term}" if clinvar_term else "#",
+            'Franklin': f"https://franklin.genoox.com/clinical-db/variant/snp/{variant_str}",
+            'Varsome': f"https://varsome.com/variant/hg19/{variant_dict.get('rs') if variant_dict.get('rs') and variant_dict.get('rs') != '.' else variant_str}?annotation-mode=germline",
+            'OncoKB': f"https://www.oncokb.org/hgvsg/{hgvs_g}?refGenome=GRCh37"
+        }
+        
+        # Add COSMIC link if LEGACY_ID exists and contains COSM
+        if variant_dict.get('LEGACY_ID') and not pd.isna(variant_dict.get('LEGACY_ID')):
+            legacy_id = str(variant_dict['LEGACY_ID'])
+            if 'COSM' in legacy_id:
+                cosmic_id = legacy_id.replace('COSM', '')  # Remove 'COSM' prefix if present
+                links['COSMIC'] = f"https://cancer.sanger.ac.uk/cosmic/mutation/overview?id={cosmic_id}"
+        
+        # Add OMIM link if disease info contains an OMIM number
+        if variant_dict.get('CLNDN') and not pd.isna(variant_dict.get('CLNDN')):
+            links['OMIM'] = f"https://omim.org/search/?search={variant_dict['CLNDN']}"
+            
+        # Add Orphanet link if we have Orphanet data
+        if variant_dict.get('Orpha') and not pd.isna(variant_dict.get('Orpha')):
+            # Extract orphanet ID from Orpha field if present
+            orpha_match = re.search(r'(\d+)\|', str(variant_dict['Orpha']))
+            if orpha_match:
+                orpha_id = orpha_match.group(1)
+                links['Orphanet'] = f"https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=EN&Expert={orpha_id}"
+        
+        return links
 
     def count_variants_by_significance(self, df):
         """Count variants by their clinical significance."""
@@ -910,19 +890,23 @@ class ClinicalReportGenerator:
         vus_count = 0
         conflicting_count = 0
 
-        for significance in df['Clinical_Significance']:
-            if pd.isna(significance):
-                continue
+        for idx, row in df.iterrows():
+            # Check CLNSIG first, then fall back to ACMG_Classification if needed
+            significance = row['CLNSIG']
+            if pd.isna(significance) or significance == '':
+                significance = row['ACMG_Classification']
+                if pd.isna(significance) or significance == '':
+                    continue
             
             significance = str(significance).lower()
             if 'conflicting' in significance:
                 conflicting_count += 1
             elif ('pathogenic' in significance and 'likely' not in significance) or \
-                 'likely_pathogenic' in significance:
+                 'likely_pathogenic' in significance or 'likely pathogenic' in significance:
                 pathogenic_count += 1
-            elif 'uncertain_significance' in significance:
+            elif 'uncertain_significance' in significance or 'uncertain significance' in significance:
                 vus_count += 1
-            elif 'benign' in significance or 'likely_benign' in significance:
+            elif 'benign' in significance:
                 benign_count += 1
 
         return pathogenic_count, benign_count, vus_count, conflicting_count
@@ -938,13 +922,13 @@ class ClinicalReportGenerator:
             f.write('##reference=hg19\n')
             
             # Write format headers for additional fields
-            f.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Sample Allele Frequency">\n')
             f.write('##INFO=<ID=gnomAD_AF,Number=A,Type=Float,Description="Population Allele Frequency (gnomAD)">\n')
             f.write('##INFO=<ID=DP,Number=1,Type=Integer,Description="Read Depth">\n')
             f.write('##INFO=<ID=GENE,Number=1,Type=String,Description="Gene Symbol">\n')
             f.write('##INFO=<ID=CLNSIG,Number=.,Type=String,Description="Clinical Significance">\n')
             f.write('##INFO=<ID=ACMG,Number=.,Type=String,Description="ACMG Classification">\n')
-            f.write('##INFO=<ID=COSMIC,Number=1,Type=String,Description="COSMIC ID">\n')
+            f.write('##INFO=<ID=EFFECT,Number=1,Type=String,Description="Variant Effect">\n')
+            f.write('##INFO=<ID=LOC,Number=1,Type=String,Description="Variant Location">\n')
             
             # Write VCF column headers
             f.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n')
@@ -953,51 +937,78 @@ class ClinicalReportGenerator:
             for _, row in df.iterrows():
                 # Prepare INFO field
                 info_fields = []
-                if not pd.isna(row['AF']):
-                    info_fields.append(f"AF={row['AF']}")
-                if not pd.isna(row.get('gnomAD_AF')):
-                    info_fields.append(f"gnomAD_AF={row['gnomAD_AF']}")
-                if not pd.isna(row['Depth']):
-                    info_fields.append(f"DP={int(row['Depth'])}")
-                if not pd.isna(row['Gene']):
-                    info_fields.append(f"GENE={row['Gene']}")
-                if not pd.isna(row['Clinical_Significance']):
-                    info_fields.append(f"CLNSIG={row['Clinical_Significance']}")
+                
+                if not pd.isna(row['Freq_gnomAD_genome_ALL']) and row['Freq_gnomAD_genome_ALL'] != '.':
+                    info_fields.append(f"gnomAD_AF={row['Freq_gnomAD_genome_ALL']}")
+                
+                if not pd.isna(row['DP']):
+                    try:
+                        dp = int(row['DP'])
+                        info_fields.append(f"DP={dp}")
+                    except (ValueError, TypeError):
+                        pass
+                
+                if not pd.isna(row['Ref.Gene']):
+                    info_fields.append(f"GENE={row['Ref.Gene']}")
+                
+                if not pd.isna(row['CLNSIG']):
+                    info_fields.append(f"CLNSIG={row['CLNSIG']}")
+                
                 if not pd.isna(row['ACMG_Classification']):
                     info_fields.append(f"ACMG={row['ACMG_Classification']}")
-                if not pd.isna(row.get('COSMIC_ID')):
-                    info_fields.append(f"COSMIC={row['COSMIC_ID']}")
+                
+                if not pd.isna(row['effect']):
+                    info_fields.append(f"EFFECT={row['effect']}")
+                
+                if not pd.isna(row['location']):
+                    info_fields.append(f"LOC={row['location']}")
                 
                 info = ';'.join(info_fields)
                 
                 # Write variant line
+                chrom = str(row['Chr']).replace('chr', '')  # Remove 'chr' prefix if present
+                
                 variant_line = [
-                    str(row['CHROM']),
-                    str(row['POS']),
-                    str(row['dbSNP_ID']) if not pd.isna(row['dbSNP_ID']) else '.',
-                    str(row['REF']),
-                    str(row['ALT']),
+                    chrom,
+                    str(row['Start']),
+                    str(row['rs']) if not pd.isna(row['rs']) and row['rs'] != '.' else '.',
+                    str(row['Ref']),
+                    str(row['Alt']),
                     '.',  # QUAL
-                    str(row['FILTER']) if not pd.isna(row['FILTER']) else '.',
+                    str(row['quality']) if not pd.isna(row['quality']) else '.',
                     info
                 ]
                 f.write('\t'.join(variant_line) + '\n')
 
-    def generate_report(self, excel_file, output_file):
-        """Generate HTML report and VCF from Excel file."""
-        # Extract sample ID from filename
-        sample_id = os.path.splitext(os.path.basename(excel_file))[0]
+    def generate_report(self, input_file, output_file, sample_id=None):
+        """Generate HTML report and VCF from TSV/Excel file."""
+        # Determine file type and read accordingly
+        file_ext = os.path.splitext(input_file)[1].lower()
         
-        # Read Excel file
-        df = pd.read_excel(excel_file)
+        if file_ext == '.xlsx' or file_ext == '.xls':
+            df = pd.read_excel(input_file)
+        elif file_ext == '.tsv' or file_ext == '.txt':
+            df = pd.read_csv(input_file, sep='\t')
+        elif file_ext == '.csv':
+            df = pd.read_csv(input_file)
+        else:
+            raise ValueError(f"Unsupported file format: {file_ext}")
         
-        # Select columns including COSMIC_ID
-        columns = ['CHROM', 'POS', 'REF', 'ALT', 'Gene', 'Location', 'dbSNP_ID', 
-                  'COSMIC_ID', 'Transcript', 'CLNHGVS', 'FILTER', 'Clinical_Significance', 
-                  'ACMG_Classification', 'ACMG_Met_Criteria', 'Disease', 'AF', 'gnomAD_AF', 'Depth']
-        df = df[columns]
+        # Extract sample ID from filename if not provided
+        if not sample_id:
+            sample_id = os.path.splitext(os.path.basename(input_file))[0]
         
-        # Limit to top 300 variants
+        # Ensure all required columns exist
+        required_columns = ['Chr', 'Start', 'Ref', 'Alt', 'Ref.Gene', 'location', 
+                          'rs', 'LEGACY_ID', 'quality', 'CLNSIG', 'ACMG_Classification', 
+                          'ACMG_Met_Criteria', 'CLNHGVS', 'CLNDN', 'Freq_gnomAD_genome_ALL', 
+                          'effect', 'DP']
+        
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = None  # Add empty column if missing
+        
+        # Limit to top 300 variants if there are more
         df = df.head(300)
         
         # Generate VCF file
@@ -1012,20 +1023,42 @@ class ClinicalReportGenerator:
         for _, row in df.iterrows():
             variant_dict = row.to_dict()
             
+            # Create formatted variant string
+            variant_dict['Variant'] = f"{row['Chr']}:{row['Start']} {row['Ref']}->{row['Alt']}"
+            
+            # Map columns to their report equivalents
+            variant_dict['Gene'] = variant_dict['Ref.Gene']
+            variant_dict['dbSNP_ID'] = variant_dict['rs'] if not pd.isna(variant_dict['rs']) and variant_dict['rs'] != '.' else 'Novel'
+            
+            # Extract COSMIC ID from LEGACY_ID if it contains "COSM"
+            cosmic_id = "Not Available"
+            if not pd.isna(variant_dict['LEGACY_ID']) and 'COSM' in str(variant_dict['LEGACY_ID']):
+                cosmic_id = variant_dict['LEGACY_ID']
+            variant_dict['COSMIC_ID'] = cosmic_id
+            
+            variant_dict['Location'] = variant_dict['location']
+            variant_dict['Effect'] = variant_dict['effect']
+            variant_dict['Quality'] = variant_dict['quality']
+            variant_dict['Disease'] = variant_dict['CLNDN'] if not pd.isna(variant_dict['CLNDN']) else ''
+            
+            # Clinical significance - prefer CLNSIG but fallback to ACMG_Classification if needed
+            clinical_sig = variant_dict['CLNSIG']
+            if pd.isna(clinical_sig) or clinical_sig == '':
+                clinical_sig = variant_dict['ACMG_Classification']
+            variant_dict['Clinical_Significance'] = clinical_sig if not pd.isna(clinical_sig) else 'Not Available'
+            
             # Add classes and formatting
-            variant_dict['significance_class'] = self.get_significance_class(row['Clinical_Significance'])
-            variant_dict['acmg_class'] = self.get_acmg_class(row['ACMG_Classification'])
-            variant_dict['filter_class'] = self.get_filter_class(row['FILTER'])
-            variant_dict['database_links'] = self.get_database_links(row['Gene'], variant_dict)
+            variant_dict['significance_class'] = self.get_significance_class(clinical_sig)
+            variant_dict['acmg_class'] = self.get_acmg_class(variant_dict['ACMG_Classification'])
+            variant_dict['quality_class'] = self.get_quality_class(variant_dict['quality'])
+            variant_dict['database_links'] = self.get_database_links(variant_dict['Gene'], variant_dict)
             
-            # Format AF values
-            variant_dict['AF_original'] = variant_dict['AF']
-            variant_dict['AF_formatted'] = self.format_af(variant_dict['AF'])
-            variant_dict['gnomAD_AF_formatted'] = self.format_af(variant_dict.get('gnomAD_AF'))
+            # Format gnomAD AF value
+            variant_dict['gnomAD_AF_formatted'] = self.format_af(variant_dict['Freq_gnomAD_genome_ALL'])
             
-            # Convert Depth to int if possible
+            # Convert depth to int if possible
             try:
-                variant_dict['Depth'] = int(variant_dict['Depth'])
+                variant_dict['Depth'] = int(variant_dict['DP']) if not pd.isna(variant_dict['DP']) else 0
             except (ValueError, TypeError):
                 variant_dict['Depth'] = 0
             
@@ -1040,7 +1073,7 @@ class ClinicalReportGenerator:
             'vus_count': vus_count,
             'benign_count': benign_count,
             'conflicting_count': conflicting_count,
-            'pass_count': df['FILTER'].str.contains('PASS', case=True, na=False).sum(),
+            'pass_count': df['quality'].str.contains('PASS', case=True, na=False).sum(),
             'variants': variants
         }
         
@@ -1057,12 +1090,13 @@ class ClinicalReportGenerator:
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python report_generator.py input.xlsx output.html")
+    if len(sys.argv) < 3:
+        print("Usage: python bio_WES_report_v0.2.py input.tsv output.html [sample_id]")
         sys.exit(1)
     
     input_file = sys.argv[1]
     output_file = sys.argv[2]
+    sample_id = sys.argv[3] if len(sys.argv) > 3 else None
     
     if not os.path.exists(input_file):
         print(f"Error: Input file '{input_file}' does not exist")
@@ -1073,9 +1107,11 @@ def main():
     
     try:
         generator = ClinicalReportGenerator()
-        generator.generate_report(input_file, output_file)
+        generator.generate_report(input_file, output_file, sample_id)
     except Exception as e:
         print(f"Error occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
