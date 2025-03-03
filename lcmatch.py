@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Script to add VCF annotations to a TSV file.
-Matches variants between the TSV and VCF files (both GATK and FreeBayes)
-and adds specified fields from the VCF as new columns in the TSV.
+Matches variants between the two files and adds specified fields from the VCF as new columns in the TSV.
 """
 
 import pandas as pd
@@ -24,8 +23,7 @@ def extract_dp(format_col, sample_col):
     
     if 'DP' in format_fields:
         dp_index = format_fields.index('DP')
-        if dp_index < len(sample_values):
-            return sample_values[dp_index]
+        return sample_values[dp_index]
     return ""
 
 def extract_snpeff_info(ann_field):
@@ -89,9 +87,7 @@ def parse_vcf(vcf_file):
                 legacy_id = extract_info_field(info, "LEGACY_ID")
                 
                 # Extract DP from FORMAT and sample columns if available
-                dp = ""
-                if len(fields) > 9:
-                    dp = extract_dp(fields[8], fields[9])
+                dp = extract_dp(fields[8], fields[9]) if len(fields) > 9 else ""
                 
                 # Extract SnpEff annotations
                 ann = extract_info_field(info, "ANN")
@@ -148,30 +144,12 @@ def parse_vcf(vcf_file):
         print(f"Error parsing VCF file: {e}", file=sys.stderr)
         sys.exit(1)
 
-def update_tsv(tsv_file, vcf_variants_gatk, vcf_variants_freebayes, output_file, source_column=None):
+def update_tsv(tsv_file, vcf_variants, output_file):
     """Update the TSV file with information from VCF variants."""
     print(f"Reading TSV file: {tsv_file}")
     try:
         # Read the TSV file
         df = pd.read_csv(tsv_file, sep='\t')
-        
-        # Try to identify the source column if not specified
-        if source_column is None:
-            for col in df.columns:
-                # Check if column has GATK or FreeBayes values
-                col_values = df[col].astype(str)
-                if (col_values.str.contains('GATK').any() and 
-                    col_values.str.contains('FreeBayes').any()):
-                    source_column = col
-                    print(f"Found source column: {source_column}")
-                    break
-            
-            # If source column still not found, warn the user
-            if source_column is None:
-                print("Warning: Could not identify a column containing variant source information (GATK or FreeBayes)")
-                print("Will try to match variants from both VCF files.")
-        else:
-            print(f"Using specified source column: {source_column}")
         
         # Initialize new columns
         new_columns = ["rs", "quality", "CLNSIG", "CLNDN", "CLNHGVS", "CLNSIGCONF", 
@@ -182,29 +160,14 @@ def update_tsv(tsv_file, vcf_variants_gatk, vcf_variants_freebayes, output_file,
         
         # Update rows based on matching variants
         match_count = 0
-        gatk_count = 0
-        freebayes_count = 0
-        
         for idx, row in df.iterrows():
-            chrom = str(row['Chr'])
+            chrom = row['Chr']
             pos = int(row['Start'])
-            ref = str(row['Ref'])
-            alt = str(row['Alt'])
-            
-            # Determine which VCF variants to use based on source
-            use_gatk = True
-            use_freebayes = True
-            
-            if source_column:
-                source_value = str(row[source_column])
-                if "GATK" in source_value:
-                    use_gatk = True
-                    use_freebayes = False
-                elif "FreeBayes" in source_value:
-                    use_gatk = False
-                    use_freebayes = True
+            ref = row['Ref']
+            alt = row['Alt']
             
             # Try different variant representations for matching
+            # Generate the same keys as in parse_vcf
             keys = []
             
             # Handle chromosomes with or without 'chr' prefix
@@ -230,32 +193,15 @@ def update_tsv(tsv_file, vcf_variants_gatk, vcf_variants_freebayes, output_file,
                         keys.append(f"{chr_var}_{pos}_{prev_base}_{prev_base+alt}")
             
             # Try all possible keys
-            variant_info = None
-            
-            # Try GATK first if specified
-            if use_gatk:
-                for key in keys:
-                    if key in vcf_variants_gatk:
-                        variant_info = vcf_variants_gatk[key]
-                        gatk_count += 1
-                        break
-            
-            # If not found in GATK or GATK not specified, try FreeBayes
-            if not variant_info and use_freebayes:
-                for key in keys:
-                    if key in vcf_variants_freebayes:
-                        variant_info = vcf_variants_freebayes[key]
-                        freebayes_count += 1
-                        break
-            
-            # If found, update the row
-            if variant_info:
-                for col in new_columns:
-                    df.at[idx, col] = variant_info[col]
-                match_count += 1
+            for key in keys:
+                if key in vcf_variants:
+                    variant_info = vcf_variants[key]
+                    for col in new_columns:
+                        df.at[idx, col] = variant_info[col]
+                    match_count += 1
+                    break
         
         print(f"Matched {match_count} out of {len(df)} variants")
-        print(f"GATK matches: {gatk_count}, FreeBayes matches: {freebayes_count}")
         
         # Write the updated dataframe to a new file
         print(f"Writing output to: {output_file}")
@@ -269,10 +215,8 @@ def update_tsv(tsv_file, vcf_variants_gatk, vcf_variants_freebayes, output_file,
 def main():
     parser = argparse.ArgumentParser(description='Add VCF annotations to a TSV file.')
     parser.add_argument('--tsv', required=True, help='Input TSV file')
-    parser.add_argument('--gatk_vcf', required=True, help='Input GATK VCF file (gzipped or not)')
-    parser.add_argument('--freebayes_vcf', required=True, help='Input FreeBayes VCF file (gzipped or not)')
+    parser.add_argument('--vcf', required=True, help='Input VCF file (gzipped or not)')
     parser.add_argument('--output', required=True, help='Output TSV file')
-    parser.add_argument('--source_column', help='Name of the column in TSV that contains source information (GATK or FreeBayes)')
     
     args = parser.parse_args()
     
@@ -281,20 +225,15 @@ def main():
         print(f"Error: TSV file '{args.tsv}' not found", file=sys.stderr)
         sys.exit(1)
     
-    if not os.path.exists(args.gatk_vcf):
-        print(f"Error: GATK VCF file '{args.gatk_vcf}' not found", file=sys.stderr)
+    if not os.path.exists(args.vcf):
+        print(f"Error: VCF file '{args.vcf}' not found", file=sys.stderr)
         sys.exit(1)
     
-    if not os.path.exists(args.freebayes_vcf):
-        print(f"Error: FreeBayes VCF file '{args.freebayes_vcf}' not found", file=sys.stderr)
-        sys.exit(1)
-    
-    # Parse VCF files
-    gatk_variants = parse_vcf(args.gatk_vcf)
-    freebayes_variants = parse_vcf(args.freebayes_vcf)
+    # Parse VCF file
+    vcf_variants = parse_vcf(args.vcf)
     
     # Update TSV file
-    update_tsv(args.tsv, gatk_variants, freebayes_variants, args.output, args.source_column)
+    update_tsv(args.tsv, vcf_variants, args.output)
 
 if __name__ == "__main__":
     main()

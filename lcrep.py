@@ -250,6 +250,7 @@ class ClinicalReportGenerator:
             table-layout: fixed;
         }
 
+        .col-rank { width: 60px; text-align: center; }
         .col-variant { width: 140px; }
         .col-gene { width: 70px; }
         .col-dbsnp { width: 90px; }
@@ -314,6 +315,19 @@ class ClinicalReportGenerator:
 
         .variants-table tr:hover {
             background-color: #e8f4fc;
+        }
+
+        .rank-bubble {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background-color: #2c3e50;
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 0.9em;
         }
 
         .significance-badge {
@@ -496,6 +510,7 @@ class ClinicalReportGenerator:
                 <table class="variants-table" id="variantsTable">
                     <thead>
                         <tr>
+                            <th class="col-rank" data-sort="rank">Rank</th>
                             <th class="col-variant" data-sort="variant">Variant</th>
                             <th class="col-gene" data-sort="gene">Gene</th>
                             <th class="col-dbsnp" data-sort="dbsnp">dbSNP ID</th>
@@ -515,6 +530,9 @@ class ClinicalReportGenerator:
                     <tbody>
                         {% for variant in variants %}
                         <tr>
+                            <td class="col-rank">
+                                <div class="rank-bubble">{{ variant.Rank }}</div>
+                            </td>
                             <td class="col-variant">{{ variant.Variant }}</td>
                             <td class="col-gene">
                                 <a href="https://www.genecards.org/cgi-bin/carddisp.pl?gene={{ variant.Gene }}" 
@@ -573,7 +591,8 @@ class ClinicalReportGenerator:
             </div>
             
             <div class="footer">
-                <p>This report contains the top 300 prioritized variants. For full results, please refer to the complete data file.</p>
+                <div class="footer">
+                <p>This report contains the top 2000 prioritized variants. For full results, please refer to the complete data file.</p>
                 <p><small>Tip: Sort columns by clicking headers. Priority sorting implemented for pathogenicity.</small></p>
             </div>
         </div>
@@ -617,6 +636,7 @@ class ClinicalReportGenerator:
             const columnToggle = document.getElementById('columnToggle');
             const table = document.getElementById('variantsTable');
             const columns = [
+                {name: 'Rank', class: 'col-rank'},
                 {name: 'Variant', class: 'col-variant'},
                 {name: 'Gene', class: 'col-gene'},
                 {name: 'dbSNP ID', class: 'col-dbsnp'},
@@ -739,8 +759,8 @@ class ClinicalReportGenerator:
                     }
                     
                     if (column === 'gnomad') {
-                        const aText = a.querySelector(`.col-${column}-af`).textContent;
-                        const bText = b.querySelector(`.col-${column}-af`).textContent;
+                        const aText = a.querySelector(`.col-gnomad-af`).textContent;
+                        const bText = b.querySelector(`.col-gnomad-af`).textContent;
                         const aVal = parseNumericValue(aText);
                         const bVal = parseNumericValue(bText);
                         
@@ -749,6 +769,12 @@ class ClinicalReportGenerator:
                         if (isNaN(aVal)) return currentSort.ascending ? 1 : -1;
                         if (isNaN(bVal)) return currentSort.ascending ? -1 : 1;
                         
+                        return currentSort.ascending ? aVal - bVal : bVal - aVal;
+                    }
+                    
+                    if (column === 'rank') {
+                        const aVal = parseInt(a.querySelector('.rank-bubble').textContent);
+                        const bVal = parseInt(b.querySelector('.rank-bubble').textContent);
                         return currentSort.ascending ? aVal - bVal : bVal - aVal;
                     }
                     
@@ -1008,8 +1034,8 @@ class ClinicalReportGenerator:
             if col not in df.columns:
                 df[col] = None  # Add empty column if missing
         
-        # Limit to top 300 variants if there are more
-        df = df.head(300)
+        # Limit to top 2000 variants if there are more
+        df = df.head(2000)
         
         # Generate VCF file
         output_vcf = output_file.rsplit('.', 1)[0] + '.vcf'
@@ -1064,6 +1090,10 @@ class ClinicalReportGenerator:
             
             variants.append(variant_dict)
         
+        # Add rank to each variant
+        for idx, variant_dict in enumerate(variants, 1):
+            variant_dict['Rank'] = idx
+            
         # Prepare template data
         template_data = {
             'sample_id': sample_id,
