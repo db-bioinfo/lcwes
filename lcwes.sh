@@ -11,8 +11,8 @@ DBSNP="/home/administrator/lifecode/genomes/databases/dbsnp_hg19/dbsnp_hg19_00-A
 CLNVAR="/home/administrator/lifecode/genomes/databases/clnvar_hg19/clinvar.chr.vcf.gz"
 COSMIC="/home/administrator/lifecode/genomes/databases/cosmic_hg19/Cosmic_GenomeScreensMutant_Normal_v101_GRCh37.chr.vcf.gz"
 SNPEFF="/home/administrator/SNPEFF/snpEff/snpEff.jar"
-INTERVARDB="/home/administrator/lifecode/genomes/intervar_humandb/intervar"
-HUMANDB="/home/administrator/lifecode/genomes/intervar_humandb/humandb"
+INTERVARDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/intervar"
+HUMANDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/humandb"
 FREEBAYES_REGIONS="/home/administrator/lifecode/genomes/freebayes_hg19/hg19_regions.txt"
 
 # Function to process a single sample
