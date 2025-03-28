@@ -8,8 +8,8 @@ THREADS=32
 REF_GENOME="/home/administrator/lifecode/genomes/databases/bwa_hg19/hg19.fa"
 TARGETS="/home/administrator/lifecode/genomes/bed_files/WES_HG19/S33266340_Covered.adj.bed"
 SNPEFF="/home/administrator/SNPEFF/snpEff/snpEff.jar"
-INTERVARDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/intervar"
-HUMANDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/humandb"
+INTERVARDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/hg19/intervar"
+HUMANDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/hg19/humandb"
 FREEBAYES_REGIONS="/home/administrator/lifecode/genomes/freebayes_hg19/hg19_regions.txt"
 
 #==========#----------#==========#----------#==========#----------#==========#----------
