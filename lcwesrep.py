@@ -359,21 +359,24 @@ def generate_html(file_path, output_path=None):
         }}
 
         /* Table column widths */
-        .col-rank {{ width: 50px; }}
-        .col-variant {{ width: 120px; }}
-        .col-gene {{ width: 70px; }}
-        .col-effect {{ width: 100px; }}
-        .col-hgvs {{ width: 100px; }}
-        .col-clinvar {{ width: 190px; }}
-        .col-acmg {{ width: 150px; }}
-        .col-acmg-codes {{ width: 150px; }}
-        .col-af-gnomad {{ width: 90px; }}
-        .col-zygosity {{ width: 90px; }}
+        .col-rank {{ width: 60px; }}
+        .col-variant {{ width: 100px; }}
+        .col-gene {{ width: 100px; }}
+        .col-rs {{ width: 40px; }} /* RS column moved after gene */
+        .col-effect {{ width: 85px; }}
+        .col-clnhgvs {{ width: 80px; }}
+        .col-hgvs-c {{ width: 110px; }}
+        .col-hgvs-p {{ width: 110px; }}
+        .col-clinvar {{ width: 165px; }}
+        .col-acmg {{ width: 165px; }}
+        .col-acmg-codes {{ width: 165px; }}
+        .col-af-gnomad {{ width: 110px; }}
+        .col-af {{ width: 70px; }} /* Replaces zygosity */
         .col-phenotype {{ width: 100px; }}
         .col-disease {{ width: 100px; }}
-        .col-database {{ width: 120px; }} /* Reduced width for icon-based database column */
+        .col-database {{ width: 140px; }} /* Reduced width for icon-based database column */
         .col-igv {{ width: 50px; }} /* IGV column */
-        .col-rs {{ width: 50px; }} /* RS column */
+        .col-filter {{ width: 70px; }} /* Filter column */
         
         /* Special handling for variant code */
         .variant-code {{
@@ -619,6 +622,42 @@ def generate_html(file_path, output_path=None):
             line-height: 1.4;
         }}
         
+        /* Copy notification tooltip */
+        .copy-tooltip {{
+            position: absolute;
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }}
+        
+        /* Info icon styling for the data cells */
+        .data-info-icon {{
+            font-size: 16px;
+            color: var(--teal);
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.2s;
+        }}
+        
+        .data-info-icon:hover {{
+            transform: scale(1.2);
+        }}
+        
+        /* Center info icon in the cell */
+        .center-icon {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }}
+        
         /* Responsive Design */
         @media (max-width: 1200px) {{
             .container {{
@@ -654,15 +693,17 @@ def generate_html(file_path, output_path=None):
     <!-- Fixed tooltip container that follows cursor -->
     <div id="fixedTooltip" class="fixed-tooltip"></div>
     
+    <!-- Copy notification tooltip -->
+    <div id="copyTooltip" class="copy-tooltip">Copied!</div>
+    
     <div class="container">
         <!-- Report Header -->
         <div class="report-header">
             <div class="header-content">
                 <h1>Genetic Variant Analysis Report</h1>
-                <p>Whole Exome Sequencing Analysis Results</p>
             </div>
             <div class="logo">
-                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNDAgNjQiPgogICAgPHN0eWxlPgogICAgICAgIC5sb2dvLXRleHQgeyBmaWxsOiAjZmZmOyBmb250LWZhbWlseTogQXJpYWwsIHNhbnMtc2VyaWY7IGZvbnQtd2VpZ2h0OiBib2xkOyBmb250LXNpemU6IDI0cHg7IH0KICAgICAgICAubG9nby1pY29uIHsgZmlsbDogIzJDQTZBNDsgfQogICAgPC9zdHlsZT4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNDAiIGhlaWdodD0iNjQiIGZpbGw9Im5vbmUiLz4KICAgIDxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjI0IiBjbGFzcz0ibG9nby1pY29uIi8+CiAgICA8cGF0aCBkPSJNMjggMjBMMzYgMjBMNDQgMzJMMzYgNDRMMjggNDRMMjAgMzJaIiBmaWxsPSIjZmZmIi8+CiAgICA8dGV4dCB4PSI3MCIgeT0iNDAiIGNsYXNzPSJsb2dvLXRleHQiPkxpZmVDb2RlPC90ZXh0Pgo8L3N2Zz4=" alt="LifeCode Logo">
+                <img src="logo.png" alt="Company Logo" style="height: 64px; width: auto;">
             </div>
         </div>
         
@@ -705,18 +746,21 @@ def generate_html(file_path, output_path=None):
                         <th class="col-rank" data-sort="rank">RANK</th>
                         <th class="col-variant" data-sort="variant">Variant</th>
                         <th class="col-gene" data-sort="gene">Gene</th>
+                        <th class="col-rs" data-sort="rs">rs</th>
                         <th class="col-effect" data-sort="effect">Effect</th>
-                        <th class="col-hgvs" data-sort="hgvs">HGVS</th>
+                        <th class="col-clnhgvs" data-sort="clnhgvs">CLNHGVS</th>
+                        <th class="col-hgvs-c" data-sort="hgvsC">HGVS C</th>
+                        <th class="col-hgvs-p" data-sort="hgvsP">HGVS P</th>
                         <th class="col-clinvar" data-sort="clinvar">Clinvar</th>
                         <th class="col-acmg" data-sort="acmg">ACMG</th>
                         <th class="col-acmg-codes" data-sort="acmgCodes">ACMG Codes</th>
                         <th class="col-af-gnomad" data-sort="afGnomad">AF GnomAD</th>
-                        <th class="col-zygosity" data-sort="zygosity">Zygosity</th>
+                        <th class="col-af" data-sort="af">AF</th>
                         <th class="col-phenotype" data-sort="phenotype">Phenotype</th>
                         <th class="col-disease" data-sort="disease">Disease</th>
                         <th class="col-database" data-sort="database">Database</th>
                         <th class="col-igv" data-sort="igv">IGV</th>
-                        <th class="col-rs" data-sort="rs">rs</th>
+                        <th class="col-filter" data-sort="filter">Filter</th>
                     </tr>
                 </thead>
                 <tbody id="variantsTableBody">
@@ -732,7 +776,7 @@ def generate_html(file_path, output_path=None):
         
         <!-- Footer -->
         <div class="footer">
-            <p>Generated with LifeCode Genomic Variant Analysis Pipeline</p>
+            <p>Generated with Genomic Variant Analysis Pipeline</p>
             <p><small>For research and clinical use. Sort columns by clicking headers.</small></p>
         </div>
     </div>
@@ -784,8 +828,50 @@ def generate_html(file_path, output_path=None):
                 'Tier 2 - Medium Priority': 2
             }};
             
+            // Function to copy text to clipboard
+            function copyToClipboard(text) {{
+                // Create a temporary textarea element
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                
+                // Make the textarea invisible and add it to the document
+                textarea.style.position = 'absolute';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                
+                // Select and copy the text
+                textarea.select();
+                document.execCommand('copy');
+                
+                // Remove the textarea
+                document.body.removeChild(textarea);
+                
+                // Show copy feedback tooltip
+                const copyTooltip = document.getElementById('copyTooltip');
+                
+                // Position the tooltip near the mouse cursor
+                const mousePosition = {{
+                    x: window.event ? window.event.clientX : 0,
+                    y: window.event ? window.event.clientY : 0
+                }};
+                
+                // Position it slightly above the cursor
+                copyTooltip.style.left = (mousePosition.x + 10) + 'px';
+                copyTooltip.style.top = (mousePosition.y - 30) + 'px';
+                
+                // Show the tooltip
+                copyTooltip.style.opacity = '1';
+                
+                // Hide it after a short delay
+                setTimeout(() => {{
+                    copyTooltip.style.opacity = '0';
+                }}, 1500);
+                
+                return true;
+            }}
+            
             // Function to add tooltip to a cell
-            function addTooltipToCell(cell, content) {{
+            function addTooltipToCell(cell, content, makeClickable = false) {{
                 if (!content || content === 'N/A' || content === '.') return;
                 
                 cell.setAttribute('data-full-content', content);
@@ -801,6 +887,17 @@ def generate_html(file_path, output_path=None):
                 cell.addEventListener('mouseleave', function() {{
                     document.getElementById('fixedTooltip').style.display = 'none';
                 }});
+                
+                // If the cell should be clickable for copying content
+                if (makeClickable) {{
+                    cell.style.cursor = 'pointer';
+                    cell.addEventListener('click', function() {{
+                        const textToCopy = this.getAttribute('data-full-content');
+                        if (textToCopy) {{
+                            copyToClipboard(textToCopy);
+                        }}
+                    }});
+                }}
             }}
             
             // Set up tooltip functionality
@@ -928,8 +1025,13 @@ def generate_html(file_path, output_path=None):
                 return {{ full: fullVariant, display: displayVariant }};
             }}
             
+            // Updated function to get Effect from ANN[0].EFFECT first, then ExonicFunc.refGene
             function getEffect(variant) {{
-                return variant.Type && variant.Type !== 'unknown' ? variant.Type : variant['Func.refGene'];
+                if (variant['ANN[0].EFFECT'] && variant['ANN[0].EFFECT'] !== '.') {{
+                    return variant['ANN[0].EFFECT'];
+                }} else {{
+                    return variant['ExonicFunc.refGene'] && variant['ExonicFunc.refGene'] !== 'unknown' ? variant['ExonicFunc.refGene'] : 'N/A';
+                }}
             }}
             
             function formatPhenotype(orphaText) {{
@@ -1041,8 +1143,8 @@ def generate_html(file_path, output_path=None):
                 // Get RS ID for links
                 const rsId = variant.avsnp151 && variant.avsnp151 !== '.' ? variant.avsnp151 : null;
                 
-                // Get HGVS for links
-                const hgvs = variant.HGVS && variant.HGVS !== '.' ? variant.HGVS : null;
+                // Get HGVS for links - now using CLNHGVS
+                const hgvs = variant.CLNHGVS && variant.CLNHGVS !== '.' ? variant.CLNHGVS : null;
                 
                 // Get gene for links
                 const gene = variant['Ref.Gene'] || '';
@@ -1115,23 +1217,26 @@ def generate_html(file_path, output_path=None):
                 const columnToggle = document.getElementById('columnToggle');
                 columnToggle.innerHTML = '';
                 
-                // Define columns to show - IGV and RS columns switched positions
+                // Define columns to show with updated column structure
                 const columnsToShow = [
                     {{name: 'RANK', field: null, class: 'col-rank'}},
                     {{name: 'Variant', field: null, class: 'col-variant'}},
                     {{name: 'Gene', field: 'Ref.Gene', class: 'col-gene'}},
-                    {{name: 'Effect', field: 'Type', class: 'col-effect'}},
-                    {{name: 'HGVS', field: 'HGVS', class: 'col-hgvs'}},
+                    {{name: 'rs', field: 'avsnp151', class: 'col-rs'}},
+                    {{name: 'Effect', field: 'ANN[0].EFFECT', class: 'col-effect'}},
+                    {{name: 'CLNHGVS', field: 'CLNHGVS', class: 'col-clnhgvs'}},
+                    {{name: 'HGVS C', field: 'ANN[0].HGVS_C', class: 'col-hgvs-c'}},
+                    {{name: 'HGVS P', field: 'ANN[0].HGVS_P', class: 'col-hgvs-p'}},
                     {{name: 'Clinvar', field: 'clinvar: Clinvar', class: 'col-clinvar'}},
                     {{name: 'ACMG', field: 'ACMG', class: 'col-acmg'}},
                     {{name: 'ACMG Codes', field: 'ACMG Criteria', class: 'col-acmg-codes'}},
                     {{name: 'AF GnomAD', field: 'Freq_gnomAD_genome_ALL', class: 'col-af-gnomad'}},
-                    {{name: 'Zygosity', field: 'Otherinfo', class: 'col-zygosity'}},
+                    {{name: 'AF', field: 'VAF', class: 'col-af'}},
                     {{name: 'Phenotype', field: 'Orpha', class: 'col-phenotype'}},
                     {{name: 'Disease', field: 'CLNDN', class: 'col-disease'}},
                     {{name: 'Database', field: null, class: 'col-database'}},
                     {{name: 'IGV', field: null, class: 'col-igv'}},
-                    {{name: 'rs', field: 'avsnp151', class: 'col-rs'}}
+                    {{name: 'Filter', field: 'Filter', class: 'col-filter'}}
                 ];
                 
                 // Create toggle for each column
@@ -1220,7 +1325,7 @@ def generate_html(file_path, output_path=None):
                 if (displayedVariants.length === 0) {{
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="15" style="text-align: center; padding: 20px;">
+                            <td colspan="18" style="text-align: center; padding: 20px;">
                                 No variants match your search criteria.
                             </td>
                         </tr>
@@ -1243,7 +1348,7 @@ def generate_html(file_path, output_path=None):
                     addTooltipToCell(rankCell, `Rank: ${{startIndex + index + 1}}`);
                     row.appendChild(rankCell);
                     
-                    // Variant - always with tooltip
+                    // MODIFIED: Variant - replace with info icon
                     const variantCell = document.createElement('td');
                     variantCell.className = 'col-variant';
                     
@@ -1254,14 +1359,19 @@ def generate_html(file_path, output_path=None):
                         variant.Alt
                     );
                     
-                    const variantCode = document.createElement('span');
-                    variantCode.className = 'variant-code';
-                    variantCode.textContent = formattedVariant.display;
+                    // Create info icon container for centered alignment
+                    const iconContainer = document.createElement('div');
+                    iconContainer.className = 'center-icon';
                     
-                    // Always add tooltip for variant cell
-                    addTooltipToCell(variantCell, formattedVariant.full);
+                    // Create info icon
+                    const infoIcon = document.createElement('i');
+                    infoIcon.className = 'fas fa-info-circle data-info-icon';
+                    iconContainer.appendChild(infoIcon);
                     
-                    variantCell.appendChild(variantCode);
+                    // Add tooltip to the info icon with clickable option
+                    addTooltipToCell(variantCell, formattedVariant.full, true);
+                    
+                    variantCell.appendChild(iconContainer);
                     row.appendChild(variantCell);
                     
                     // Gene
@@ -1277,31 +1387,82 @@ def generate_html(file_path, output_path=None):
                     addTooltipToCell(geneCell, variant['Ref.Gene']);
                     row.appendChild(geneCell);
                     
-                    // Effect - always with tooltip
+                    // MODIFIED: RS - replace with info icon
+                    const rsCell = document.createElement('td');
+                    rsCell.className = 'col-rs';
+                    const rsValue = variant.avsnp151 || 'N/A';
+                    
+                    if (rsValue === 'N/A' || rsValue === '.') {{
+                        rsCell.textContent = 'N/A';
+                        rsCell.className += ' not-available';
+                    }} else {{
+                        // Create info icon container for centered alignment
+                        const iconContainer = document.createElement('div');
+                        iconContainer.className = 'center-icon';
+                        
+                        // Create info icon
+                        const infoIcon = document.createElement('i');
+                        infoIcon.className = 'fas fa-info-circle data-info-icon';
+                        iconContainer.appendChild(infoIcon);
+                        
+                        // Add tooltip for rs with clickable option
+                        addTooltipToCell(rsCell, rsValue, true);
+                        
+                        rsCell.appendChild(iconContainer);
+                    }}
+                    row.appendChild(rsCell);
+                    
+                    // Effect - always with tooltip - now using ANN[0].EFFECT first, then ExonicFunc.refGene
                     const effectCell = document.createElement('td');
                     effectCell.className = 'col-effect';
                     const effectText = getEffect(variant);
                     effectCell.textContent = effectText || 'N/A';
                     
-                    if (!effectText) {{
+                    if (!effectText || effectText === 'N/A') {{
                         effectCell.className += ' not-available';
                     }} else {{
                         addTooltipToCell(effectCell, effectText);
                     }}
                     row.appendChild(effectCell);
                     
-                    // HGVS - always with tooltip
-                    const hgvsCell = document.createElement('td');
-                    hgvsCell.className = 'col-hgvs';
-                    const hgvsText = variant.HGVS || 'N/A';
-                    hgvsCell.textContent = hgvsText;
+                    // CLNHGVS - always with tooltip - replacing HGVS column
+                    const clnhgvsCell = document.createElement('td');
+                    clnhgvsCell.className = 'col-clnhgvs';
+                    const clnhgvsText = variant.CLNHGVS || 'N/A';
+                    clnhgvsCell.textContent = clnhgvsText;
                     
-                    if (hgvsText === 'N/A') {{
-                        hgvsCell.className += ' not-available';
+                    if (clnhgvsText === 'N/A' || clnhgvsText === '.') {{
+                        clnhgvsCell.className += ' not-available';
                     }} else {{
-                        addTooltipToCell(hgvsCell, hgvsText);
+                        addTooltipToCell(clnhgvsCell, clnhgvsText);
                     }}
-                    row.appendChild(hgvsCell);
+                    row.appendChild(clnhgvsCell);
+                    
+                    // HGVS C - new column
+                    const hgvsCCell = document.createElement('td');
+                    hgvsCCell.className = 'col-hgvs-c';
+                    const hgvsCText = variant['ANN[0].HGVS_C'] || 'N/A';
+                    hgvsCCell.textContent = hgvsCText;
+                    
+                    if (hgvsCText === 'N/A' || hgvsCText === '.') {{
+                        hgvsCCell.className += ' not-available';
+                    }} else {{
+                        addTooltipToCell(hgvsCCell, hgvsCText);
+                    }}
+                    row.appendChild(hgvsCCell);
+                    
+                    // HGVS P - new column
+                    const hgvsPCell = document.createElement('td');
+                    hgvsPCell.className = 'col-hgvs-p';
+                    const hgvsPText = variant['ANN[0].HGVS_P'] || 'N/A';
+                    hgvsPCell.textContent = hgvsPText;
+                    
+                    if (hgvsPText === 'N/A' || hgvsPText === '.') {{
+                        hgvsPCell.className += ' not-available';
+                    }} else {{
+                        addTooltipToCell(hgvsPCell, hgvsPText);
+                    }}
+                    row.appendChild(hgvsPCell);
                     
                     // UPDATED: Clinvar with badge styling and updated naming
                     const clinvarCell = document.createElement('td');
@@ -1376,52 +1537,75 @@ def generate_html(file_path, output_path=None):
                     row.appendChild(acmgCodesCell);
                     
                     // AF GnomAD - no tooltip
-                    const afCell = document.createElement('td');
-                    afCell.className = 'col-af-gnomad';
+                    const afGnomadCell = document.createElement('td');
+                    afGnomadCell.className = 'col-af-gnomad';
                     if (variant['Freq_gnomAD_genome_ALL'] && variant['Freq_gnomAD_genome_ALL'] !== '.') {{
-                        afCell.textContent = variant['Freq_gnomAD_genome_ALL'];
+                        afGnomadCell.textContent = variant['Freq_gnomAD_genome_ALL'];
                         // Removed tooltip for AF GnomAD
                     }} else {{
-                        afCell.textContent = 'N/A';
+                        afGnomadCell.textContent = 'N/A';
+                        afGnomadCell.className += ' not-available';
+                    }}
+                    row.appendChild(afGnomadCell);
+                    
+                    // AF - replaces Zygosity - no tooltip
+                    const afCell = document.createElement('td');
+                    afCell.className = 'col-af';
+                    const afText = variant.VAF || 'N/A';
+                    afCell.textContent = afText;
+                    
+                    if (afText === 'N/A' || afText === '.') {{
                         afCell.className += ' not-available';
                     }}
                     row.appendChild(afCell);
                     
-                    // Zygosity - no tooltip
-                    const zygosityCell = document.createElement('td');
-                    zygosityCell.className = 'col-zygosity';
-                    const zygosityText = variant.Otherinfo || 'N/A';
-                    zygosityCell.textContent = zygosityText;
-                    
-                    if (zygosityText === 'N/A') {{
-                        zygosityCell.className += ' not-available';
-                    }}
-                    // Removed tooltip for Zygosity
-                    row.appendChild(zygosityCell);
-                    
-                    // Phenotype - always with tooltip
+                    // MODIFIED: Phenotype - replace with info icon
                     const phenotypeCell = document.createElement('td');
                     phenotypeCell.className = 'col-phenotype';
                     const phenotypeText = formatPhenotype(variant.Orpha);
-                    phenotypeCell.textContent = phenotypeText || 'N/A';
                     
                     if (!phenotypeText) {{
+                        phenotypeCell.textContent = 'N/A';
                         phenotypeCell.className += ' not-available';
                     }} else {{
-                        addTooltipToCell(phenotypeCell, phenotypeText);
+                        // Create info icon container for centered alignment
+                        const iconContainer = document.createElement('div');
+                        iconContainer.className = 'center-icon';
+                        
+                        // Create info icon
+                        const infoIcon = document.createElement('i');
+                        infoIcon.className = 'fas fa-info-circle data-info-icon';
+                        iconContainer.appendChild(infoIcon);
+                        
+                        // Add tooltip for phenotype with clickable option
+                        addTooltipToCell(phenotypeCell, phenotypeText, true);
+                        
+                        phenotypeCell.appendChild(iconContainer);
                     }}
                     row.appendChild(phenotypeCell);
                     
-                    // Disease - always with tooltip
+                    // MODIFIED: Disease - replace with info icon
                     const diseaseCell = document.createElement('td');
                     diseaseCell.className = 'col-disease';
                     const diseaseText = getDisease(variant);
-                    diseaseCell.textContent = diseaseText || 'N/A';
                     
                     if (!diseaseText) {{
+                        diseaseCell.textContent = 'N/A';
                         diseaseCell.className += ' not-available';
                     }} else {{
-                        addTooltipToCell(diseaseCell, diseaseText);
+                        // Create info icon container for centered alignment
+                        const iconContainer = document.createElement('div');
+                        iconContainer.className = 'center-icon';
+                        
+                        // Create info icon
+                        const infoIcon = document.createElement('i');
+                        infoIcon.className = 'fas fa-info-circle data-info-icon';
+                        iconContainer.appendChild(infoIcon);
+                        
+                        // Add tooltip for disease with clickable option
+                        addTooltipToCell(diseaseCell, diseaseText, true);
+                        
+                        diseaseCell.appendChild(iconContainer);
                     }}
                     row.appendChild(diseaseCell);
                     
@@ -1488,7 +1672,7 @@ def generate_html(file_path, output_path=None):
                     databaseCell.appendChild(linksContainer);
                     row.appendChild(databaseCell);
                     
-                    // IGV cell - moved before RS
+                    // IGV cell
                     const igvCell = document.createElement('td');
                     igvCell.className = 'col-igv';
                     
@@ -1516,19 +1700,34 @@ def generate_html(file_path, output_path=None):
                     
                     row.appendChild(igvCell);
                     
-                    // rs - always with tooltip - moved after IGV
-                    const rsCell = document.createElement('td');
-                    rsCell.className = 'col-rs';
-                    const rsValue = variant.avsnp151 || 'N/A';
-                    rsCell.textContent = rsValue;
+                    // Filter column with icons
+                    const filterCell = document.createElement('td');
+                    filterCell.className = 'col-filter';
+                    const filterText = variant.Filter || 'N/A';
                     
-                    if (rsValue === 'N/A' || rsValue === '.') {{
-                        rsCell.className += ' not-available';
+                    if (filterText === 'PASS') {{
+                        // Green tick for PASS
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-check-circle';
+                        icon.style.color = '#4CAF50';
+                        icon.style.fontSize = '16px';
+                        filterCell.appendChild(icon);
+                        addTooltipToCell(filterCell, 'PASS');
+                    }} else if (filterText === 'N/A' || filterText === '.') {{
+                        // For N/A or empty values
+                        filterCell.textContent = 'N/A';
+                        filterCell.className += ' not-available';
                     }} else {{
-                        // Always add tooltip for rs
-                        addTooltipToCell(rsCell, rsValue);
+                        // Red X for any other filter value
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-times-circle';
+                        icon.style.color = '#E74C3C';
+                        icon.style.fontSize = '16px';
+                        filterCell.appendChild(icon);
+                        addTooltipToCell(filterCell, filterText);
                     }}
-                    row.appendChild(rsCell);
+                    
+                    row.appendChild(filterCell);
                     
                     tbody.appendChild(row);
                 }});
@@ -1599,7 +1798,7 @@ def generate_html(file_path, output_path=None):
                         // Search in multiple fields
                         return (
                             (variant['Ref.Gene'] && variant['Ref.Gene'].toLowerCase().includes(searchTerm)) ||
-                            (variant.HGVS && variant.HGVS.toLowerCase().includes(searchTerm)) ||
+                            (variant.CLNHGVS && variant.CLNHGVS.toLowerCase().includes(searchTerm)) ||
                             (variant.Chr && `${{variant.Chr}}:${{variant.Start}}`.toLowerCase().includes(searchTerm)) ||
                             (variant.avsnp151 && variant.avsnp151.toLowerCase().includes(searchTerm)) ||
                             (variant.Orpha && variant.Orpha.toLowerCase().includes(searchTerm)) ||
@@ -1656,14 +1855,29 @@ def generate_html(file_path, output_path=None):
                                 bValue = b['Ref.Gene'] || '';
                                 break;
                                 
+                            case 'rs':
+                                aValue = a.avsnp151 || '';
+                                bValue = b.avsnp151 || '';
+                                break;
+                                
                             case 'effect':
                                 aValue = getEffect(a) || '';
                                 bValue = getEffect(b) || '';
                                 break;
                                 
-                            case 'hgvs':
-                                aValue = a.HGVS || '';
-                                bValue = b.HGVS || '';
+                            case 'clnhgvs':
+                                aValue = a.CLNHGVS || '';
+                                bValue = b.CLNHGVS || '';
+                                break;
+                                
+                            case 'hgvsC':
+                                aValue = a['ANN[0].HGVS_C'] || '';
+                                bValue = b['ANN[0].HGVS_C'] || '';
+                                break;
+                                
+                            case 'hgvsP':
+                                aValue = a['ANN[0].HGVS_P'] || '';
+                                bValue = b['ANN[0].HGVS_P'] || '';
                                 break;
                                 
                             case 'clinvar':
@@ -1689,9 +1903,9 @@ def generate_html(file_path, output_path=None):
                                 bValue = parseFloat(b['Freq_gnomAD_genome_ALL']) || 0;
                                 break;
                                 
-                            case 'zygosity':
-                                aValue = a.Otherinfo || '';
-                                bValue = b.Otherinfo || '';
+                            case 'af':
+                                aValue = parseFloat(a.VAF) || 0;
+                                bValue = parseFloat(b.VAF) || 0;
                                 break;
                                 
                             case 'phenotype':
@@ -1717,9 +1931,9 @@ def generate_html(file_path, output_path=None):
                                 bValue = b.rank <= 300 ? 0 : 1;
                                 break;
                                 
-                            case 'rs':
-                                aValue = a.avsnp151 || '';
-                                bValue = b.avsnp151 || '';
+                            case 'filter':
+                                aValue = a.Filter || '';
+                                bValue = b.Filter || '';
                                 break;
                                 
                             default:

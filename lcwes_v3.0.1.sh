@@ -4,23 +4,35 @@
 FASTQ_DIR="."
 
 # Set paths to required tools and reference files
-THREADS=32
+# Alignment-Variant Calling
 REF_GENOME="/home/administrator/lifecode/genomes/databases/bwa_hg19/hg19.fa"
 TARGETS="/home/administrator/lifecode/genomes/bed_files/WES_HG19/S33266340_Covered.adj.bed"
-SNPEFF="/home/administrator/SNPEFF/snpEff/snpEff.jar"
+# Annotation
+SNPEFF_JAR="/home/administrator/snpeff/snpEff/snpEff.jar"
+CLINVAR_VCF="/home/administrator/lifecode/genomes/databases/clnvar_hg19/clinvar.chr.vcf.gz"
+DBSNP_VCF="/home/administrator/lifecode/genomes/databases/dbsnp_hg19/dbsnp_hg19_00-All.vcf.gz"
+# Downstream analysis
 INTERVARDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/hg19/intervar"
 HUMANDB="/home/administrator/lifecode/genomes/databases/intervar_humandb/hg19/humandb"
-FREEBAYES_REGIONS="/home/administrator/lifecode/genomes/freebayes_hg19/hg19_regions.txt"
-
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+FREEBAYES_REGIONS="/home/administrator/lifecode/genomes/databases/freebayes_regions_hg19/hg19_regions.txt"
+# Computation
+THREADS=32
 
 # Function to process a single sample
 process_sample() {
 	local sample=$1
 	local fastq1=$2
 	local fastq2=$3
+
+#-------------------------- Filtering & Alignment ---------------------------#
+
+# Quality Control / Trimming
+conda run -n FASTP fastp --in1 $fastq1 --in2 $fastq2 \
+	--out1 ${sample}_t1.fq.gz --out2 ${sample}_t2.fq.gz \
+	--detect_adapter_for_pe \
+	--html report.html \
+	--json report.json \
+	--thread 16
 
 # Alignment
 bwa mem -R "@RG\tID:${sample}\tLB:exome_lib\tPL:MGISEQ\tPU:unit1\tSM:${sample}" -t $THREADS \
@@ -44,9 +56,7 @@ rm ${sample}_aligned_rg.bam*
 # Prepare annovar scripts
 ln -s /home/administrator/Annovar/annovar/*.pl .
 
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+#-------------------------- Merge Variants & Report ---------------------------#
 
 # Launch GATK in the background
 process_gatk "$sample" &
@@ -68,13 +78,13 @@ if [ $GATK_STATUS -eq 0 ] && [ $FREEBAYES_STATUS -eq 0 ]; then
 
 	echo "Merging"
 	# Merge gatk & top 20 freebayes
-	python lcwesmer.py ${sample}_GATK.variants.prioritized.tsv ${sample}_freebayes.variants.prioritized.20.tsv > ${sample}_variants.tsv
+	python lcwesmer.py ${sample}_gatk.variants.annotated.prioritized.tsv ${sample}_freebayes.variants.annotated.prioritized.20.tsv > ${sample}_variants.tsv
 
 	# Create Report
 	python lcwesrep.py ${sample}_variants.tsv ${sample}.html
 
 	# Create bed file
-	awk 'NR > 1 {print $1 "\t" $2 "\t" $3 "\t" $6}' ${sample}_variants.tsv | head -n 300 > ${sample}_variants.bed
+	awk 'NR > 1 {print $1 "\t" $2 "\t" $3 "\t" $6}' ${sample}_variants.tsv | head -n 500 > ${sample}_variants.bed
 
 	# Create IGV report
 	create_report ${sample}_variants.bed --genome hg19 --flanking 1000 --tracks ${sample}_aligned_marked.bam --output ${sample}.IGV.html
@@ -89,9 +99,7 @@ fi
 
 }
 
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+#-------------------------- GATK Variant Calling ---------------------------#
 
 # GATK variant calling
 process_gatk() {
@@ -150,61 +158,91 @@ gatk MergeVcfs \
 
 rm ${sample}_snps.filtered.vcf.gz* ${sample}_indels.filtered.vcf.gz*
 
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+#-------------------------- GATK Variant Annoation ---------------------------#
 
-# Convert vcf to Annovar format
-convert2annovar.pl -format vcf4 ${sample}_GATK.filtered.vcf.gz > ${sample}_GATK.avinput
-# Annovar hgvs annotation
-annotate_variation.pl -out ${sample}_GATK_hgvs -build hg19 -hgvs ${sample}_GATK.avinput $HUMANDB
-# Re order
-./lcwesreor.sh ${sample}_GATK_hgvs.exonic_variant_function > ${sample}_GATK_hgvs.exonic_variant_function.reorder
-# cleanup
-rm ${sample}_GATK_hgvs.log ${sample}_GATK_hgvs.variant_function ${sample}_GATK_hgvs.exonic_variant_function
+# Annotate with SnpEff
+java -jar $SNPEFF_JAR ann -v hg19 ${sample}_GATK.filtered.vcf.gz | \
+bcftools view --threads $THREADS -Oz -o ${sample}_gatk.vcf
+
+rm ${sample}_GATK_filtered.vcf.gz*
 
 # Intervar/Annovar annotation
 Intervar.py -b hg19 \
-	-i ${sample}_GATK.filtered.vcf.gz --input_type=VCF \
-	-o ${sample}_GATK.intervar \
+	-i ${sample}_gatk.vcf --input_type=VCF \
+	-o ${sample}_gatk.intervar \
 	-t $INTERVARDB \
 	-d $HUMANDB
 
 # convert 1 -> chr1
-python lcwesint2chr.py ${sample}_GATK.intervar.hg19_multianno.txt.intervar ${sample}_GATK.intervar.hg19_multianno.txt.chr.intervar
+python lcwesint2chr.py ${sample}_gatk.intervar.hg19_multianno.txt.intervar ${sample}_gatk.intervar.hg19_multianno.txt.chr.intervar
 
 # Keep only nessacary columns from .txt.intervar file
-python lcwesExtCol1.py ${sample}_GATK.intervar.hg19_multianno.txt.chr.intervar ${sample}_GATK.intervar.txt
+python lcwesExtCol1.py ${sample}_gatk.intervar.hg19_multianno.txt.chr.intervar ${sample}_gatk.intervar.txt
 
 # Keep only nessecary columns from multianno file
-python lcwesExtCol2.py ${sample}_GATK.intervar.hg19_multianno.txt ${sample}_GATK.multianno.txt
+python lcwesExtCol2.py ${sample}_gatk.intervar.hg19_multianno.txt ${sample}_gatk.multianno.txt
 
 # Merge intervar & multianno
-python lcwesmerge.py ${sample}_GATK.intervar.txt ${sample}_GATK.multianno.txt ${sample}_GATK.var.txt
+python lcwesmerge.py ${sample}_gatk.intervar.txt ${sample}_gatk.multianno.txt ${sample}_gatk.var.txt
 
 # Re-order
-cut -f1,2,3,4,5,22,6,7,8,9,10,11,12,13,14,15,16,17,23,24,25,26,27,28,29,30,18,19,20,21,31,32,33 ${sample}_GATK.var.txt > ${sample}_GATK.variants.txt
+cut -f1,2,3,4,5,22,6,7,8,9,10,11,12,13,14,15,16,17,23,24,25,26,27,28,29,30,18,19,20,21,31,32,33 ${sample}_gatk.var.txt > ${sample}_gatk.variants.txt
+
+#-------------------------- ADD Hgvs-c Hgvs-p, Effect, CLNHGVS VAF/AF, PASS/Quality ---------------------------#
+
+# Hgvs-c/Hgvs-p/Effect
+# Extract only the highest impact annotation for each variant
+conda run -n SNPSIFT SnpSift extractFields ${sample}_gatk.vcf \
+  CHROM POS REF ALT \
+  "ANN[0].GENE" "ANN[0].FEATUREID" "ANN[0].EFFECT" "ANN[0].HGVS_C" "ANN[0].HGVS_P" \
+  >> ${sample}_gatk.snpsift.tsv
+
+# bgzip
+bgzip ${sample}_gatk.vcf
+tabix -p vcf ${sample}_gatk.vcf.gz
+
+# CLNHGVS id
+bcftools annotate --threads $THREADS -a $CLINVAR_VCF \
+	-c CLNHGVS,INFO -O z \
+	-o ${sample}_gatk.clnvar.vcf.gz ${sample}_gatk.vcf.gz
+
+# Index the ClinVar annotated VCF
+tabix -p vcf ${sample}_gatk.clnvar.vcf.gz
+
+# RS id
+bcftools annotate --threads $THREADS -a $DBSNP_VCF \
+	-c ID \
+	-o ${sample}_gatk.clnvar.dbsnp.vcf.gz ${sample}_gatk.clnvar.vcf.gz
+
+# Index file
+tabix -p vcf ${sample}_gatk.clnvar.dbsnp.vcf.gz
+
+# Extract qual,af,clnhgvs
+python lcwesClnExt.py ${sample}_gatk.clnvar.dbsnp.vcf.gz ${sample}_gatk.clnvar.tsv
+
+# Merge clnvar snpsift
+python lcwesmergeSnpSift2Clnvar.py ${sample}_gatk.clnvar.tsv ${sample}_gatk.snpsift.tsv ${sample}_gatk.clnsnp.tsv
+
+# Merge clnsnp to gatk
+python lcwesmergeClnSnp2Prior.py --threads 32 ${sample}_gatk.variants.txt ${sample}_gatk.clnsnp.tsv ${sample}_gatk.variants.annotated.tsv
+
+#-------------------------- GATK Variant Prioritization ---------------------------#
 
 # Variant Prioritization
-python prioritize_variants.py ${sample}_GATK.variants.txt ${sample}_GATK.variants.prioritized.tmp
+python prioritize_variants.py ${sample}_gatk.variants.annotated.tsv ${sample}_gatk.variants.prioritized.tmp
 
 # Split intervar to ACMG
-python lcwessplit.py ${sample}_GATK.variants.prioritized.tmp ${sample}_GATK.variants.prioritized.2.tmp
-
-# Add hgvs to final output
-python lcweshgvs.py ${sample}_GATK.variants.prioritized.2.tmp ${sample}_GATK_hgvs.exonic_variant_function.reorder ${sample}_GATK.variants.prioritized.tsv
+python lcwessplit.py ${sample}_gatk.variants.prioritized.tmp ${sample}_gatk.variants.annotated.prioritized.tsv
 
 # cleanup
-rm ${sample}_GATK.intervar.* ${sample}_GATK.multianno.txt ${sample}_GATK.var.txt ${sample}_GATK.variants.txt
-rm ${sample}_GATK.filtered.* variant_merge* ${sample}_GATK_hgvs.exonic_variant_function.reorder
-rm ${sample}_GATK.variants.prioritized.tmp ${sample}_GATK.variants.prioritized.2.tmp
-rm ${sample}_GATK.avinput ${sample}_GATK.variants.prioritized_stats.json
+rm ${sample}_gatk.intervar.* ${sample}_gatk.multianno.txt ${sample}_gatk.var.txt ${sample}_gatk.variants.txt
+rm ${sample}_gatk.filtered.* variant_merge* ${sample}_gatk_hgvs.exonic_variant_function.reorder
+rm ${sample}_gatk.variants.prioritized.tmp ${sample}_gatk.variants.prioritized.2.tmp
+rm ${sample}_gatk.avinput ${sample}_gatk.variants.prioritized_stats.json
 
 }
 
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+#-------------------------- FREEBAYES VARIANT CALLING ---------------------------#
 
 process_freebayes() {
 	local sample=$1
@@ -228,22 +266,17 @@ rm ${sample}_freebayes.filtered.tmp.vcf
 bgzip ${sample}_freebayes.filtered.vcf
 tabix -p vcf ${sample}_freebayes.filtered.vcf.gz
 
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
-#==========#----------#==========#----------#==========#----------#==========#----------
+#-------------------------- FREEBAYES VARIANT ANNOTATION ---------------------------#
 
-# Convert vcf to Annovar format
-convert2annovar.pl -format vcf4 ${sample}_freebayes.filtered.vcf.gz > ${sample}_freebayes.avinput
-# Annovar hgvs annotation
-annotate_variation.pl -out ${sample}_freebayes_hgvs -build hg19 -hgvs ${sample}_freebayes.avinput $HUMANDB
-# Re order
-./lcwesreor.sh ${sample}_freebayes_hgvs.exonic_variant_function > ${sample}_freebayes_hgvs.exonic_variant_function.reorder
-# cleanup
-rm ${sample}_freebayes_hgvs.log ${sample}_freebayes_hgvs.variant_function ${sample}_freebayes_hgvs.exonic_variant_function
+# Annotate with SnpEff
+java -jar $SNPEFF_JAR ann -v hg19 ${sample}_freebayes.filtered.vcf.gz | \
+bcftools view --threads $THREADS -Oz -o ${sample}_freebayes.vcf
 
-# Intervar/Annovar Annotation
+rm ${sample}_freebayes_filtered.vcf.gz*
+
+# Intervar/Annovar annotation
 Intervar.py -b hg19 \
-	-i ${sample}_freebayes.filtered.vcf.gz --input_type=VCF \
+	-i ${sample}_freebayes.vcf --input_type=VCF \
 	-o ${sample}_freebayes.intervar \
 	-t $INTERVARDB \
 	-d $HUMANDB
@@ -263,16 +296,54 @@ python lcwesmerge.py ${sample}_freebayes.intervar.txt ${sample}_freebayes.multia
 # Re-order
 cut -f1,2,3,4,5,22,6,7,8,9,10,11,12,13,14,15,16,17,23,24,25,26,27,28,29,30,18,19,20,21,31,32,33 ${sample}_freebayes.var.txt > ${sample}_freebayes.variants.txt
 
+#-------------------------- ADD Hgvs-c Hgvs-p, Effect, CLNHGVS VAF/AF, PASS/Quality ---------------------------#
+
+# Hgvs-c/Hgvs-p/Effect
+# Extract only the highest impact annotation for each variant
+conda run -n SNPSIFT SnpSift extractFields ${sample}_freebayes.vcf \
+  CHROM POS REF ALT \
+  "ANN[0].GENE" "ANN[0].FEATUREID" "ANN[0].EFFECT" "ANN[0].HGVS_C" "ANN[0].HGVS_P" \
+  >> ${sample}_freebayes.snpsift.tsv
+
+# bgzip
+bgzip ${sample}_freebayes.vcf
+tabix -p vcf ${sample}_freebayes.vcf.gz
+
+# CLNHGVS id
+bcftools annotate --threads $THREADS -a $CLINVAR_VCF \
+	-c CLNHGVS,INFO -O z \
+	-o ${sample}_freebayes.clnvar.vcf.gz ${sample}_freebayes.vcf.gz
+
+# Index the ClinVar annotated VCF
+tabix -p vcf ${sample}_freebayes.clnvar.vcf.gz
+
+# RS id
+bcftools annotate --threads $THREADS -a $DBSNP_VCF \
+	-c ID \
+	-o ${sample}_freebayes.clnvar.dbsnp.vcf.gz ${sample}_freebayes.clnvar.vcf.gz
+
+# Index file
+tabix -p vcf ${sample}_freebayes.clnvar.dbsnp.vcf.gz
+
+# Extract qual,af,clnhgvs
+python lcwesClnExt.py ${sample}_freebayes.clnvar.dbsnp.vcf.gz ${sample}_freebayes.clnvar.tsv
+
+# Merge clnvar snpsift
+python lcwesmergeSnpSift2Clnvar.py ${sample}_freebayes.clnvar.tsv ${sample}_freebayes.snpsift.tsv ${sample}_freebayes.clnsnp.tsv
+
+# Merge clnsnp to freebayes
+python lcwesmergeClnSnp2Prior.py --threads 32 ${sample}_freebayes.variants.txt ${sample}_freebayes.clnsnp.tsv ${sample}_freebayes.variants.annotated.tsv
+
+#-------------------------- Variant Prioritization ---------------------------#
+
 # Variant Prioritization
-python prioritize_variants.py ${sample}_freebayes.variants.txt ${sample}_freebayes.variants.prioritized.tmp
+python prioritize_variants.py ${sample}_freebayes.variants.annotated.tsv ${sample}_freebayes.variants.prioritized.tmp
 
 # Split intervar to ACMG
-python lcwessplit.py ${sample}_freebayes.variants.prioritized.tmp ${sample}_freebayes.variants.prioritized.2.tmp
+python lcwessplit.py ${sample}_freebayes.variants.prioritized.tmp ${sample}_freebayes.variants.annotated.prioritized.tsv
 
-# Add hgvs to final output
-python lcweshgvs.py ${sample}_freebayes.variants.prioritized.2.tmp ${sample}_freebayes_hgvs.exonic_variant_function.reorder ${sample}_freebayes.variants.prioritized.tsv
-
-head -n 20 ${sample}_freebayes.variants.prioritized.tsv > ${sample}_freebayes.variants.prioritized.20.tsv
+# Keep first 20 prioritized variants
+head -n 20 ${sample}_freebayes.variants.annotated.prioritized.tsv > ${sample}_freebayes.variants.annotated.prioritized.20.tsv
 
 # cleanup
 rm ${sample}_freebayes.intervar.* ${sample}_freebayes.multianno.txt ${sample}_freebayes.var.txt ${sample}_freebayes.variants.txt
