@@ -80,6 +80,9 @@ if [ $GATK_STATUS -eq 0 ] && [ $FREEBAYES_STATUS -eq 0 ]; then
 	# Merge gatk & top 20 freebayes
 	python lcwesmer.py ${sample}_gatk.variants.annotated.prioritized.tsv ${sample}_freebayes.variants.annotated.prioritized.20.tsv > ${sample}_variants.tsv
 
+	# Quality Metrics
+	bash lcwesqc.sh
+
 	# Create Report
 	python lcwesrep.py ${sample}_variants.tsv ${sample}.html
 

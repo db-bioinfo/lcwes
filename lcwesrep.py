@@ -20,7 +20,67 @@ def read_tsv_file(file_path):
                 rows.append(variant)
     return headers, rows
 
-def generate_html(file_path, output_path=None):
+def read_coverage_metrics(file_path):
+    """Read coverage metrics file and extract key values"""
+    metrics = {}
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+            # Extract sample ID from the first line
+            first_line = content.split('\n')[0]
+            sample_id = first_line.split(':')[-1].strip() if ':' in first_line else "Unknown"
+            metrics['sample_id'] = sample_id
+            
+            # Extract metrics using simple parsing
+            raw_reads = extract_metric(content, 'Raw reads: ')
+            trimmed_reads = extract_metric(content, 'Trimmed reads: ')
+            
+            # Remove "(total from R1 and R2)" from raw and trimmed reads
+            metrics['raw_reads'] = raw_reads.replace("(total from R1 and R2)", "").strip()
+            metrics['trimmed_reads'] = trimmed_reads.replace("(total from R1 and R2)", "").strip()
+            
+            metrics['mean_read_length'] = extract_metric(content, 'Mean read length: ')
+            metrics['uniquely_mapped_reads'] = extract_metric(content, 'Uniquely mapped reads: ').split(' ')[0]
+            metrics['duplicate_reads'] = extract_metric(content, 'Duplicate reads: ').split(' ')[0]
+            metrics['average_coverage'] = extract_metric(content, 'Average coverage: ')
+            metrics['bases_10x'] = extract_metric(content, 'Percentage of bases with ≥10X coverage: ')
+            metrics['bases_30x'] = extract_metric(content, 'Percentage of bases with ≥30X coverage: ')
+            metrics['bases_50x'] = extract_metric(content, 'Percentage of bases with ≥50X coverage: ')
+            metrics['bases_100x'] = extract_metric(content, 'Percentage of bases with ≥100X coverage: ')
+            metrics['bases_200x'] = extract_metric(content, 'Percentage of bases with ≥200X coverage: ')
+            metrics['bases_300x'] = extract_metric(content, 'Percentage of bases with ≥300X coverage: ')
+    except Exception as e:
+        print(f"Warning: Could not read coverage metrics file: {e}")
+        # Set default values
+        metrics = {
+            'sample_id': "Unknown",
+            'raw_reads': "N/A",
+            'trimmed_reads': "N/A",
+            'mean_read_length': "N/A",
+            'uniquely_mapped_reads': "N/A",
+            'duplicate_reads': "N/A",
+            'average_coverage': "N/A",
+            'bases_10x': "N/A",
+            'bases_30x': "N/A",
+            'bases_50x': "N/A",
+            'bases_100x': "N/A",
+            'bases_200x': "N/A",
+            'bases_300x': "N/A"
+        }
+    return metrics
+
+def extract_metric(content, prefix):
+    """Helper function to extract a metric value from the content"""
+    try:
+        for line in content.split('\n'):
+            if prefix in line:
+                return line.split(prefix)[1].strip()
+    except:
+        pass
+    return "N/A"
+
+def generate_html(file_path, output_path=None, coverage_metrics_path=None):
     """Generate HTML report from TSV file"""
     # Determine output filename if not specified
     if not output_path:
@@ -37,6 +97,33 @@ def generate_html(file_path, output_path=None):
     except Exception as e:
         print(f"Error reading TSV file: {e}")
         return False
+    
+    # Read coverage metrics if available
+    coverage_metrics = {}
+    if coverage_metrics_path and os.path.exists(coverage_metrics_path):
+        coverage_metrics = read_coverage_metrics(coverage_metrics_path)
+    else:
+        # Try to find a coverage metrics file with standard naming
+        potential_metrics_file = f"{sample_name}_coverage_metrics.txt"
+        if os.path.exists(potential_metrics_file):
+            coverage_metrics = read_coverage_metrics(potential_metrics_file)
+        else:
+            print(f"Warning: Coverage metrics file not found. Using default values.")
+            coverage_metrics = {
+                'sample_id': sample_name,
+                'raw_reads': "N/A",
+                'trimmed_reads': "N/A",
+                'mean_read_length': "N/A",
+                'uniquely_mapped_reads': "N/A",
+                'duplicate_reads': "N/A",
+                'average_coverage': "N/A",
+                'bases_10x': "N/A",
+                'bases_30x': "N/A",
+                'bases_50x': "N/A",
+                'bases_100x': "N/A",
+                'bases_200x': "N/A",
+                'bases_300x': "N/A"
+            }
     
     # Convert data to JSON for embedding in HTML
     variants_json = json.dumps(variants)
@@ -56,7 +143,7 @@ def generate_html(file_path, output_path=None):
         /* Color Palette as specified */
         :root {{
             /* Primary Colors (Main Branding) */
-            --deep-blue: #1E3A5F;
+            --deep-blue: #06274b;
             --teal: #2CA6A4;
             --soft-gray: #F4F4F4;
             
@@ -65,6 +152,7 @@ def generate_html(file_path, output_path=None):
             --green: #4CAF50;
             --red: #E74C3C;
             --purple: #9C27B0;
+            --lime: #a6ce4d; /* New lime green color for icons and bars */
             
             /* Typography & Background */
             --dark-text: #212121;
@@ -104,31 +192,25 @@ def generate_html(file_path, output_path=None):
             padding: 20px;
         }}
         
-        /* Header Styles */
+        /* Header Styles - REDUCED BY 15% */
         .report-header {{
             background-color: var(--deep-blue);
             color: var(--white-bg);
-            padding: 20px 30px;
+            padding: 8.5px 12px; /* Reduced from 10px */
             border-radius: 10px 10px 0 0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-        }}
-        
-        .header-content h1 {{
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }}
-        
-        .header-content p {{
-            font-size: 14px;
-            opacity: 0.9;
+            width: 23%;
+            max-width: 231px;
+            margin-left: 0;
+            margin-right: auto;
+            height: 45px; /* Reduced from ~51px (15% reduction) */
         }}
         
         .logo img {{
-            height: 64px;
+            height: 29px; /* Reduced from 34px (15% reduction) */
             width: auto;
         }}
         
@@ -173,6 +255,124 @@ def generate_html(file_path, output_path=None):
             line-height: 1.4;
         }}
         
+        /* REDUCED: Coverage Metrics Section by 50% */
+        .coverage-section {{
+            background-color: var(--white-bg);
+            padding: 10px; /* Reduced from 20px */
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px; /* Reduced from 20px */
+        }}
+        
+        .coverage-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px; /* Reduced from 15px */
+            border-bottom: 1px solid var(--light-border);
+            padding-bottom: 5px; /* Reduced from 10px */
+        }}
+        
+        .coverage-header h3 {{
+            color: var(--deep-blue);
+            font-size: 14px; /* Reduced from 16px */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        
+        .coverage-metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 8px; /* Reduced from 15px */
+        }}
+        
+        .metrics-card {{
+            background-color: var(--soft-gray);
+            border-radius: 8px;
+            padding: 8px; /* Reduced from 15px */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 55px; /* Reduced height - was approx 80-90px */
+        }}
+        
+        .metrics-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }}
+        
+        .metrics-title {{
+            font-size: 11px; /* Reduced from 12px */
+            color: var(--medium-gray);
+            margin-bottom: 3px; /* Reduced from 5px */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        
+        .metrics-title i {{
+            color: var(--lime); /* Changed from teal to lime green */
+        }}
+        
+        .metrics-value {{
+            font-size: 15px; /* Reduced from 18px */
+            font-weight: 600;
+            color: var(--deep-blue);
+        }}
+        
+        .coverage-distribution {{
+            margin-top: 10px; /* Reduced from 20px */
+        }}
+        
+        .coverage-distribution h4 {{
+            color: var(--deep-blue);
+            font-size: 12px; /* Reduced from 14px */
+            margin-bottom: 8px; /* Reduced from 15px */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        
+        .coverage-bars {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px; /* Reduced from 15px */
+        }}
+        
+        .coverage-item {{
+            margin-bottom: 3px; /* Reduced from 6px */
+        }}
+        
+        .coverage-label {{
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px; /* Reduced from 4px */
+            font-size: 11px; /* Reduced from 12px */
+        }}
+        
+        .coverage-label-text {{
+            color: var(--deep-blue);
+            font-weight: 500;
+        }}
+        
+        .coverage-percent {{
+            color: var(--medium-gray);
+        }}
+        
+        .coverage-bar-bg {{
+            width: 100%;
+            height: 5px; /* Reduced from 6px */
+            background-color: var(--soft-gray);
+            border-radius: 3px;
+            overflow: hidden;
+        }}
+        
+        .coverage-bar-fill {{
+            height: 100%;
+            background: linear-gradient(90deg, var(--lime) 0%, #8ab22f 100%); /* Changed color to lime green */
+            border-radius: 3px;
+        }}
+        
         /* Controls */
         .controls {{
             background-color: var(--white-bg);
@@ -180,29 +380,23 @@ def generate_html(file_path, output_path=None):
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }}
+        
+        .search-controls {{
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
         }}
         
         .search-box {{
-            width: 100%;
+            flex-grow: 1;
             padding: 10px 15px;
-            margin-bottom: 15px;
             border: 1px solid var(--light-border);
             border-radius: 4px;
             font-size: 14px;
-        }}
-        
-        .column-toggle {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-        }}
-        
-        .column-toggle label {{
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 14px;
-            cursor: pointer;
         }}
         
         .refresh-button {{
@@ -217,6 +411,7 @@ def generate_html(file_path, output_path=None):
             cursor: pointer;
             font-size: 14px;
             transition: background-color 0.2s;
+            white-space: nowrap;
         }}
         
         .refresh-button:hover {{
@@ -282,7 +477,7 @@ def generate_html(file_path, output_path=None):
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
-            min-width: 1700px; /* Ensure table has a minimum width */
+            min-width: 1600px; /* Adjusted for merged columns */
             table-layout: fixed;
         }}
         
@@ -359,24 +554,23 @@ def generate_html(file_path, output_path=None):
         }}
 
         /* Table column widths */
-        .col-rank {{ width: 60px; }}
-        .col-variant {{ width: 100px; }}
+        .col-rank {{ width: 55px; }}
+        .col-variant {{ width: 80px; }}
+        .col-rs {{ width: 35px; }} /* RS column moved after variant */
         .col-gene {{ width: 100px; }}
-        .col-rs {{ width: 40px; }} /* RS column moved after gene */
-        .col-effect {{ width: 85px; }}
-        .col-clnhgvs {{ width: 80px; }}
-        .col-hgvs-c {{ width: 110px; }}
-        .col-hgvs-p {{ width: 110px; }}
-        .col-clinvar {{ width: 165px; }}
+        .col-effect {{ width: 155px; }}
+        .col-clnhgvs {{ width: 130px; }}
+        .col-hgvs {{ width: 140px; }} /* Merged HGVS column with increased width */
+        .col-clinvar {{ width: 215px; }}
         .col-acmg {{ width: 165px; }}
-        .col-acmg-codes {{ width: 165px; }}
-        .col-af-gnomad {{ width: 110px; }}
-        .col-af {{ width: 70px; }} /* Replaces zygosity */
-        .col-phenotype {{ width: 100px; }}
-        .col-disease {{ width: 100px; }}
+        .col-acmg-codes {{ width: 130px; }}
+        .col-af-gnomad {{ width: 105px; }}
+        .col-af {{ width: 60px; }} /* Replaces zygosity */
+        .col-phenotype {{ width: 60px; }}
+        .col-disease {{ width: 60px; }}
         .col-database {{ width: 140px; }} /* Reduced width for icon-based database column */
         .col-igv {{ width: 50px; }} /* IGV column */
-        .col-filter {{ width: 70px; }} /* Filter column */
+        .col-filter {{ width: 80px; }} /* Filter column */
         
         /* Special handling for variant code */
         .variant-code {{
@@ -604,7 +798,7 @@ def generate_html(file_path, output_path=None):
             color: var(--benign-color);
         }}
         
-        /* Fixed tooltip styles */
+        /* Fixed tooltip styles - IMPROVED FOR WRAPPING LONG CONTENT */
         .fixed-tooltip {{
             display: none;
             position: absolute;
@@ -615,11 +809,14 @@ def generate_html(file_path, output_path=None):
             font-size: 15px;
             font-weight: bold;
             z-index: 1000;
-            max-width: 300px;
+            max-width: 350px; /* Increased from 300px */
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             pointer-events: none;
-            white-space: normal;
+            white-space: normal; /* Ensure wrapping */
             line-height: 1.4;
+            overflow-wrap: break-word; /* Force words to break */
+            word-wrap: break-word;
+            word-break: break-word; /* Additional word breaking for long strings */
         }}
         
         /* Copy notification tooltip */
@@ -640,7 +837,7 @@ def generate_html(file_path, output_path=None):
         /* Info icon styling for the data cells */
         .data-info-icon {{
             font-size: 16px;
-            color: var(--teal);
+            color: var(--lime); /* Changed from teal to lime green */
             cursor: pointer;
             text-align: center;
             transition: transform 0.2s;
@@ -658,6 +855,36 @@ def generate_html(file_path, output_path=None):
             height: 100%;
         }}
         
+        /* Center N/A text in cells */
+        .center-na {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            color: var(--medium-gray);
+            font-style: italic;
+        }}
+        
+        /* HGVS stacked styles */
+        .hgvs-container {{
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }}
+        
+        .hgvs-item {{
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        
+        .hgvs-item .label {{
+            font-weight: bold;
+            margin-right: 4px;
+            font-size: 12px;
+            color: var(--deep-blue);
+        }}
+        
         /* Responsive Design */
         @media (max-width: 1200px) {{
             .container {{
@@ -671,20 +898,32 @@ def generate_html(file_path, output_path=None):
             .chart-container {{
                 min-height: 200px;
             }}
+            
+            .coverage-metrics-grid {{
+                grid-template-columns: repeat(2, 1fr);
+            }}
+            
+            .coverage-bars {{
+                grid-template-columns: repeat(2, 1fr);
+            }}
         }}
         
         @media (max-width: 768px) {{
             .report-header {{
-                flex-direction: column;
-                text-align: center;
-            }}
-            
-            .logo {{
-                margin-top: 15px;
+                width: 41%;
+                max-width: none;
             }}
             
             .metrics-grid {{
                 grid-template-columns: 1fr 1fr;
+            }}
+            
+            .coverage-metrics-grid {{
+                grid-template-columns: 1fr;
+            }}
+            
+            .coverage-bars {{
+                grid-template-columns: 1fr;
             }}
         }}
     </style>
@@ -697,13 +936,10 @@ def generate_html(file_path, output_path=None):
     <div id="copyTooltip" class="copy-tooltip">Copied!</div>
     
     <div class="container">
-        <!-- Report Header -->
+        <!-- Report Header - MODIFIED -->
         <div class="report-header">
-            <div class="header-content">
-                <h1>Genetic Variant Analysis Report</h1>
-            </div>
             <div class="logo">
-                <img src="logo.png" alt="Company Logo" style="height: 64px; width: auto;">
+                <img src="logo.png" alt="Company Logo" style="height: 29px; width: auto;">
             </div>
         </div>
         
@@ -730,11 +966,124 @@ def generate_html(file_path, output_path=None):
             </div>
         </div>
         
-        <!-- Search and Column Toggle -->
+        <!-- NEW: Coverage Metrics Section - REDUCED BY 50% -->
+        <div class="coverage-section">
+            <div class="coverage-header">
+                <h3><i class="fas fa-chart-line"></i> Sequencing Quality Metrics</h3>
+            </div>
+            
+            <div class="coverage-metrics-grid">
+                <!-- Read Statistics -->
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-file-alt"></i> Raw Reads</div>
+                    <div class="metrics-value">{coverage_metrics.get('raw_reads', 'N/A')}</div>
+                </div>
+                
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-cut"></i> Trimmed Reads</div>
+                    <div class="metrics-value">{coverage_metrics.get('trimmed_reads', 'N/A')}</div>
+                </div>
+                
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-ruler"></i> Mean Read Length</div>
+                    <div class="metrics-value">{coverage_metrics.get('mean_read_length', 'N/A')}</div>
+                </div>
+                
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-map-marker-alt"></i> Uniquely Mapped Reads</div>
+                    <div class="metrics-value">{coverage_metrics.get('uniquely_mapped_reads', 'N/A')}</div>
+                </div>
+                
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-copy"></i> Duplicate Reads</div>
+                    <div class="metrics-value">{coverage_metrics.get('duplicate_reads', 'N/A')}</div>
+                </div>
+                
+                <div class="metrics-card">
+                    <div class="metrics-title"><i class="fas fa-layer-group"></i> Average Coverage</div>
+                    <div class="metrics-value">{coverage_metrics.get('average_coverage', 'N/A')}</div>
+                </div>
+            </div>
+            
+            <!-- Coverage Distribution Section -->
+            <div class="coverage-distribution">
+                <h4><i class="fas fa-chart-bar"></i> Coverage Distribution</h4>
+                
+                <div class="coverage-bars">
+                    <!-- 10X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥10X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_10x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_10x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 30X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥30X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_30x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_30x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 50X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥50X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_50x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_50x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 100X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥100X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_100x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_100x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 200X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥200X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_200x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_200x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 300X Coverage -->
+                    <div class="coverage-item">
+                        <div class="coverage-label">
+                            <span class="coverage-label-text">≥300X Coverage</span>
+                            <span class="coverage-percent">{coverage_metrics.get('bases_300x', 'N/A')}</span>
+                        </div>
+                        <div class="coverage-bar-bg">
+                            <div class="coverage-bar-fill" style="width: {coverage_metrics.get('bases_300x', '0%').replace('%', '')}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search and Reset View Button -->
         <div class="controls">
-            <input type="text" id="searchInput" class="search-box" placeholder="Search for genes, variants, or phenotypes...">
-            <div class="column-toggle" id="columnToggle">
-                <!-- Column toggle options will be added dynamically -->
+            <div class="search-controls">
+                <button id="refreshButton" class="refresh-button"><i class="fas fa-sync-alt"></i> Reset View</button>
+                <input type="text" id="searchInput" class="search-box" placeholder="Search for genes, variants, or phenotypes...">
             </div>
         </div>
         
@@ -745,19 +1094,18 @@ def generate_html(file_path, output_path=None):
                     <tr>
                         <th class="col-rank" data-sort="rank">RANK</th>
                         <th class="col-variant" data-sort="variant">Variant</th>
-                        <th class="col-gene" data-sort="gene">Gene</th>
                         <th class="col-rs" data-sort="rs">rs</th>
+                        <th class="col-gene" data-sort="gene">Gene</th>
                         <th class="col-effect" data-sort="effect">Effect</th>
                         <th class="col-clnhgvs" data-sort="clnhgvs">CLNHGVS</th>
-                        <th class="col-hgvs-c" data-sort="hgvsC">HGVS C</th>
-                        <th class="col-hgvs-p" data-sort="hgvsP">HGVS P</th>
+                        <th class="col-hgvs" data-sort="hgvs">HGVS</th>
                         <th class="col-clinvar" data-sort="clinvar">Clinvar</th>
                         <th class="col-acmg" data-sort="acmg">ACMG</th>
                         <th class="col-acmg-codes" data-sort="acmgCodes">ACMG Codes</th>
                         <th class="col-af-gnomad" data-sort="afGnomad">AF GnomAD</th>
                         <th class="col-af" data-sort="af">AF</th>
-                        <th class="col-phenotype" data-sort="phenotype">Phenotype</th>
-                        <th class="col-disease" data-sort="disease">Disease</th>
+                        <th class="col-phenotype" data-sort="phenotype">P <i class="fas fa-notes-medical"></i></th>
+                        <th class="col-disease" data-sort="disease">D <i class="fas fa-notes-medical"></i></th>
                         <th class="col-database" data-sort="database">Database</th>
                         <th class="col-igv" data-sort="igv">IGV</th>
                         <th class="col-filter" data-sort="filter">Filter</th>
@@ -914,12 +1262,14 @@ def generate_html(file_path, output_path=None):
                     if (targetCell && (
                         targetCell.classList.contains('col-phenotype') || 
                         targetCell.classList.contains('col-disease') || 
-                        targetCell.classList.contains('col-rs') ||
                         targetCell.classList.contains('col-database') ||
                         targetCell.classList.contains('col-igv')
                     )) {{
                         // Position tooltip to the left of the cursor
                         tooltip.style.left = (e.pageX - tooltip.offsetWidth - 15) + 'px';
+                    }} else if (targetCell && targetCell.classList.contains('col-rs')) {{
+                        // Position tooltip to the right of the cursor for RS column
+                        tooltip.style.left = (e.pageX + 15) + 'px';
                     }} else {{
                         // Default: Position tooltip to the right of the cursor
                         tooltip.style.left = (e.pageX + 15) + 'px';
@@ -1026,12 +1376,22 @@ def generate_html(file_path, output_path=None):
             }}
             
             // Updated function to get Effect from ANN[0].EFFECT first, then ExonicFunc.refGene
+            // With modifications to replace * with space and remove 'variant'
             function getEffect(variant) {{
+                let effectText = '';
                 if (variant['ANN[0].EFFECT'] && variant['ANN[0].EFFECT'] !== '.') {{
-                    return variant['ANN[0].EFFECT'];
+                    effectText = variant['ANN[0].EFFECT'];
                 }} else {{
-                    return variant['ExonicFunc.refGene'] && variant['ExonicFunc.refGene'] !== 'unknown' ? variant['ExonicFunc.refGene'] : 'N/A';
+                    effectText = variant['ExonicFunc.refGene'] && variant['ExonicFunc.refGene'] !== 'unknown' ? variant['ExonicFunc.refGene'] : 'N/A';
                 }}
+                
+                // Replace * with space and remove 'variant'
+                if (effectText && effectText !== 'N/A') {{
+                    effectText = effectText.replace(/\*/g, ' ').replace(/_/g, ' ');
+                    effectText = effectText.replace(/variant/g, '').trim();
+                }}
+                
+                return effectText;
             }}
             
             function formatPhenotype(orphaText) {{
@@ -1212,105 +1572,25 @@ def generate_html(file_path, output_path=None):
                 return `${{sampleName}}.IGV.html`;
             }}
             
-            // Setup column visibility toggles
-            function setupColumnToggle() {{
-                const columnToggle = document.getElementById('columnToggle');
-                columnToggle.innerHTML = '';
+            // Reset button functionality
+            document.getElementById('refreshButton').addEventListener('click', function() {{
+                // Reset the variants to original state
+                filteredVariants = [...originalVariants];
                 
-                // Define columns to show with updated column structure
-                const columnsToShow = [
-                    {{name: 'RANK', field: null, class: 'col-rank'}},
-                    {{name: 'Variant', field: null, class: 'col-variant'}},
-                    {{name: 'Gene', field: 'Ref.Gene', class: 'col-gene'}},
-                    {{name: 'rs', field: 'avsnp151', class: 'col-rs'}},
-                    {{name: 'Effect', field: 'ANN[0].EFFECT', class: 'col-effect'}},
-                    {{name: 'CLNHGVS', field: 'CLNHGVS', class: 'col-clnhgvs'}},
-                    {{name: 'HGVS C', field: 'ANN[0].HGVS_C', class: 'col-hgvs-c'}},
-                    {{name: 'HGVS P', field: 'ANN[0].HGVS_P', class: 'col-hgvs-p'}},
-                    {{name: 'Clinvar', field: 'clinvar: Clinvar', class: 'col-clinvar'}},
-                    {{name: 'ACMG', field: 'ACMG', class: 'col-acmg'}},
-                    {{name: 'ACMG Codes', field: 'ACMG Criteria', class: 'col-acmg-codes'}},
-                    {{name: 'AF GnomAD', field: 'Freq_gnomAD_genome_ALL', class: 'col-af-gnomad'}},
-                    {{name: 'AF', field: 'VAF', class: 'col-af'}},
-                    {{name: 'Phenotype', field: 'Orpha', class: 'col-phenotype'}},
-                    {{name: 'Disease', field: 'CLNDN', class: 'col-disease'}},
-                    {{name: 'Database', field: null, class: 'col-database'}},
-                    {{name: 'IGV', field: null, class: 'col-igv'}},
-                    {{name: 'Filter', field: 'Filter', class: 'col-filter'}}
-                ];
+                // Clear search input
+                document.getElementById('searchInput').value = '';
                 
-                // Create toggle for each column
-                columnsToShow.forEach((column, index) => {{
-                    const label = document.createElement('label');
-                    const checkbox = document.createElement('input');
-                    checkbox.type = 'checkbox';
-                    checkbox.checked = true;
-                    checkbox.setAttribute('data-column', index);
-                    checkbox.setAttribute('data-class', column.class);
-                    
-                    checkbox.addEventListener('change', function() {{
-                        const colIndex = this.getAttribute('data-column');
-                        const colClass = this.getAttribute('data-class');
-                        const isChecked = this.checked;
-                        
-                        // Toggle column visibility
-                        const table = document.getElementById('variantsTable');
-                        const headers = table.querySelectorAll('th');
-                        const rows = table.querySelectorAll('tbody tr');
-                        
-                        // Toggle header
-                        if (headers[colIndex]) {{
-                            headers[colIndex].style.display = isChecked ? '' : 'none';
-                        }}
-                        
-                        // Toggle cells
-                        rows.forEach(row => {{
-                            const cells = row.querySelectorAll('td');
-                            if (cells[colIndex]) {{
-                                cells[colIndex].style.display = isChecked ? '' : 'none';
-                            }}
-                        }});
-                    }});
-                    
-                    label.appendChild(checkbox);
-                    label.appendChild(document.createTextNode(column.name));
-                    columnToggle.appendChild(label);
+                // Reset column headers (clear sorting indicators)
+                const tableHeaders = document.querySelectorAll('#variantsTable th');
+                tableHeaders.forEach(header => {{
+                    header.removeAttribute('data-direction');
                 }});
                 
-                // Add refresh button after all column toggles
-                const refreshButton = document.createElement('button');
-                refreshButton.id = 'refreshButton';
-                refreshButton.className = 'refresh-button';
-                refreshButton.innerHTML = '<i class="fas fa-sync-alt"></i> Reset View';
-                refreshButton.addEventListener('click', function() {{
-                    // Reset the variants to original state
-                    filteredVariants = [...originalVariants];
-                    
-                    // Clear search input
-                    document.getElementById('searchInput').value = '';
-                    
-                    // Reset column headers (clear sorting indicators)
-                    const tableHeaders = document.querySelectorAll('#variantsTable th');
-                    tableHeaders.forEach(header => {{
-                        header.removeAttribute('data-direction');
-                    }});
-                    
-                    // Make sure all column toggles are checked
-                    const columnToggles = document.querySelectorAll('#columnToggle input[type="checkbox"]');
-                    columnToggles.forEach(toggle => {{
-                        if (!toggle.checked) {{
-                            toggle.checked = true;
-                            toggle.dispatchEvent(new Event('change'));
-                        }}
-                    }});
-                    
-                    // Reset to first page and update display
-                    currentPage = 1;
-                    renderTable(currentPage);
-                    renderPagination();
-                }});
-                columnToggle.appendChild(refreshButton);
-            }}
+                // Reset to first page and update display
+                currentPage = 1;
+                renderTable(currentPage);
+                renderPagination();
+            }});
             
             // Render table with pagination
             function renderTable(page) {{
@@ -1325,7 +1605,7 @@ def generate_html(file_path, output_path=None):
                 if (displayedVariants.length === 0) {{
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="18" style="text-align: center; padding: 20px;">
+                            <td colspan="17" style="text-align: center; padding: 20px;">
                                 No variants match your search criteria.
                             </td>
                         </tr>
@@ -1374,27 +1654,17 @@ def generate_html(file_path, output_path=None):
                     variantCell.appendChild(iconContainer);
                     row.appendChild(variantCell);
                     
-                    // Gene
-                    const geneCell = document.createElement('td');
-                    geneCell.className = 'col-gene';
-                    const geneLink = document.createElement('a');
-                    geneLink.href = `https://www.genecards.org/cgi-bin/carddisp.pl?gene=${{variant['Ref.Gene']}}`;
-                    geneLink.target = '_blank';
-                    geneLink.className = 'gene-link';
-                    geneLink.textContent = variant['Ref.Gene'];
-                    geneCell.appendChild(geneLink);
-                    // Add tooltip for gene
-                    addTooltipToCell(geneCell, variant['Ref.Gene']);
-                    row.appendChild(geneCell);
-                    
-                    // MODIFIED: RS - replace with info icon
+                    // MODIFIED: RS - replace with info icon (moved here before gene)
                     const rsCell = document.createElement('td');
                     rsCell.className = 'col-rs';
                     const rsValue = variant.avsnp151 || 'N/A';
                     
                     if (rsValue === 'N/A' || rsValue === '.') {{
-                        rsCell.textContent = 'N/A';
-                        rsCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        rsCell.appendChild(naContainer);
                     }} else {{
                         // Create info icon container for centered alignment
                         const iconContainer = document.createElement('div');
@@ -1411,6 +1681,19 @@ def generate_html(file_path, output_path=None):
                         rsCell.appendChild(iconContainer);
                     }}
                     row.appendChild(rsCell);
+                    
+                    // Gene (moved after RS)
+                    const geneCell = document.createElement('td');
+                    geneCell.className = 'col-gene';
+                    const geneLink = document.createElement('a');
+                    geneLink.href = `https://www.genecards.org/cgi-bin/carddisp.pl?gene=${{variant['Ref.Gene']}}`;
+                    geneLink.target = '_blank';
+                    geneLink.className = 'gene-link';
+                    geneLink.textContent = variant['Ref.Gene'];
+                    geneCell.appendChild(geneLink);
+                    // Add tooltip for gene
+                    addTooltipToCell(geneCell, variant['Ref.Gene']);
+                    row.appendChild(geneCell);
                     
                     // Effect - always with tooltip - now using ANN[0].EFFECT first, then ExonicFunc.refGene
                     const effectCell = document.createElement('td');
@@ -1438,31 +1721,59 @@ def generate_html(file_path, output_path=None):
                     }}
                     row.appendChild(clnhgvsCell);
                     
-                    // HGVS C - new column
-                    const hgvsCCell = document.createElement('td');
-                    hgvsCCell.className = 'col-hgvs-c';
+                    // NEW: Merged HGVS Column (combining HGVS C and HGVS P)
+                    const hgvsCell = document.createElement('td');
+                    hgvsCell.className = 'col-hgvs';
+                    
                     const hgvsCText = variant['ANN[0].HGVS_C'] || 'N/A';
-                    hgvsCCell.textContent = hgvsCText;
-                    
-                    if (hgvsCText === 'N/A' || hgvsCText === '.') {{
-                        hgvsCCell.className += ' not-available';
-                    }} else {{
-                        addTooltipToCell(hgvsCCell, hgvsCText);
-                    }}
-                    row.appendChild(hgvsCCell);
-                    
-                    // HGVS P - new column
-                    const hgvsPCell = document.createElement('td');
-                    hgvsPCell.className = 'col-hgvs-p';
                     const hgvsPText = variant['ANN[0].HGVS_P'] || 'N/A';
-                    hgvsPCell.textContent = hgvsPText;
                     
-                    if (hgvsPText === 'N/A' || hgvsPText === '.') {{
-                        hgvsPCell.className += ' not-available';
+                    // Container for stacked HGVS values
+                    const hgvsContainer = document.createElement('div');
+                    hgvsContainer.className = 'hgvs-container';
+                    
+                    // HGVS C entry
+                    const hgvsCItem = document.createElement('div');
+                    hgvsCItem.className = 'hgvs-item';
+                    
+                    const hgvsCLabel = document.createElement('span');
+                    hgvsCLabel.className = 'label';
+                    hgvsCLabel.textContent = 'C:';
+                    hgvsCItem.appendChild(hgvsCLabel);
+                    
+                    const hgvsCValue = document.createTextNode(hgvsCText !== 'N/A' ? hgvsCText : 'N/A');
+                    hgvsCItem.appendChild(hgvsCValue);
+                    
+                    if (hgvsCText !== 'N/A' && hgvsCText !== '.') {{
+                        addTooltipToCell(hgvsCItem, hgvsCText);
                     }} else {{
-                        addTooltipToCell(hgvsPCell, hgvsPText);
+                        hgvsCItem.classList.add('not-available');
                     }}
-                    row.appendChild(hgvsPCell);
+                    
+                    hgvsContainer.appendChild(hgvsCItem);
+                    
+                    // HGVS P entry
+                    const hgvsPItem = document.createElement('div');
+                    hgvsPItem.className = 'hgvs-item';
+                    
+                    const hgvsPLabel = document.createElement('span');
+                    hgvsPLabel.className = 'label';
+                    hgvsPLabel.textContent = 'P:';
+                    hgvsPItem.appendChild(hgvsPLabel);
+                    
+                    const hgvsPValue = document.createTextNode(hgvsPText !== 'N/A' ? hgvsPText : 'N/A');
+                    hgvsPItem.appendChild(hgvsPValue);
+                    
+                    if (hgvsPText !== 'N/A' && hgvsPText !== '.') {{
+                        addTooltipToCell(hgvsPItem, hgvsPText);
+                    }} else {{
+                        hgvsPItem.classList.add('not-available');
+                    }}
+                    
+                    hgvsContainer.appendChild(hgvsPItem);
+                    hgvsCell.appendChild(hgvsContainer);
+                    
+                    row.appendChild(hgvsCell);
                     
                     // UPDATED: Clinvar with badge styling and updated naming
                     const clinvarCell = document.createElement('td');
@@ -1495,8 +1806,8 @@ def generate_html(file_path, output_path=None):
                         acmgCell.appendChild(badge);
                         // Tooltip for ACMG removed as requested
                     }} else {{
-                        acmgCell.textContent = 'N/A';
-                        acmgCell.className += ' not-available';
+                        clinvarCell.textContent = 'N/A';
+                        clinvarCell.className += ' not-available';
                     }}
                     row.appendChild(acmgCell);
                     
@@ -1530,8 +1841,11 @@ def generate_html(file_path, output_path=None):
                         
                         acmgCodesCell.appendChild(criteriaContainer);
                     }} else {{
-                        acmgCodesCell.textContent = 'N/A';
-                        acmgCodesCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        acmgCodesCell.appendChild(naContainer);
                     }}
                     
                     row.appendChild(acmgCodesCell);
@@ -1565,8 +1879,11 @@ def generate_html(file_path, output_path=None):
                     const phenotypeText = formatPhenotype(variant.Orpha);
                     
                     if (!phenotypeText) {{
-                        phenotypeCell.textContent = 'N/A';
-                        phenotypeCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        phenotypeCell.appendChild(naContainer);
                     }} else {{
                         // Create info icon container for centered alignment
                         const iconContainer = document.createElement('div');
@@ -1590,8 +1907,11 @@ def generate_html(file_path, output_path=None):
                     const diseaseText = getDisease(variant);
                     
                     if (!diseaseText) {{
-                        diseaseCell.textContent = 'N/A';
-                        diseaseCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        diseaseCell.appendChild(naContainer);
                     }} else {{
                         // Create info icon container for centered alignment
                         const iconContainer = document.createElement('div');
@@ -1681,12 +2001,14 @@ def generate_html(file_path, output_path=None):
                     if (variant.rank <= 300) {{
                         // Create container for IGV link
                         const igvContainer = document.createElement('div');
-                        igvContainer.className = 'database-links';
+                        igvContainer.className = 'center-icon';
                         
                         // Create IGV link with Font Awesome
                         const igvLink = document.createElement('a');
                         igvLink.href = generateIGVLink(variant);
                         igvLink.className = 'db-icon-link igv';
+                        igvLink.style.height = '28px'; // Force same height as other database icons
+                        igvLink.style.width = '28px';  // Force same width as other database icons
                         igvLink.innerHTML = '<i class="fas fa-eye"></i>';
                         igvLink.target = '_blank';
                         addTooltipToCell(igvLink, 'View in IGV Browser');
@@ -1694,8 +2016,11 @@ def generate_html(file_path, output_path=None):
                         igvContainer.appendChild(igvLink);
                         igvCell.appendChild(igvContainer);
                     }} else {{
-                        igvCell.textContent = 'N/A';
-                        igvCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        igvCell.appendChild(naContainer);
                     }}
                     
                     row.appendChild(igvCell);
@@ -1711,19 +2036,33 @@ def generate_html(file_path, output_path=None):
                         icon.className = 'fas fa-check-circle';
                         icon.style.color = '#4CAF50';
                         icon.style.fontSize = '16px';
-                        filterCell.appendChild(icon);
+                        
+                        // Center icon
+                        const iconContainer = document.createElement('div');
+                        iconContainer.className = 'center-icon';
+                        iconContainer.appendChild(icon);
+                        filterCell.appendChild(iconContainer);
+                        
                         addTooltipToCell(filterCell, 'PASS');
                     }} else if (filterText === 'N/A' || filterText === '.') {{
-                        // For N/A or empty values
-                        filterCell.textContent = 'N/A';
-                        filterCell.className += ' not-available';
+                        // Create centered N/A container
+                        const naContainer = document.createElement('div');
+                        naContainer.className = 'center-na';
+                        naContainer.textContent = 'N/A';
+                        filterCell.appendChild(naContainer);
                     }} else {{
                         // Red X for any other filter value
                         const icon = document.createElement('i');
                         icon.className = 'fas fa-times-circle';
                         icon.style.color = '#E74C3C';
                         icon.style.fontSize = '16px';
-                        filterCell.appendChild(icon);
+                        
+                        // Center icon
+                        const iconContainer = document.createElement('div');
+                        iconContainer.className = 'center-icon';
+                        iconContainer.appendChild(icon);
+                        filterCell.appendChild(iconContainer);
+                        
                         addTooltipToCell(filterCell, filterText);
                     }}
                     
@@ -1813,8 +2152,6 @@ def generate_html(file_path, output_path=None):
                 renderPagination();
             }});
             
-            // Reset button functionality is now added directly when creating the button
-            
             // Sorting functionality
             const tableHeaders = document.querySelectorAll('#variantsTable th');
             tableHeaders.forEach(header => {{
@@ -1870,14 +2207,10 @@ def generate_html(file_path, output_path=None):
                                 bValue = b.CLNHGVS || '';
                                 break;
                                 
-                            case 'hgvsC':
-                                aValue = a['ANN[0].HGVS_C'] || '';
-                                bValue = b['ANN[0].HGVS_C'] || '';
-                                break;
-                                
-                            case 'hgvsP':
-                                aValue = a['ANN[0].HGVS_P'] || '';
-                                bValue = b['ANN[0].HGVS_P'] || '';
+                            case 'hgvs':
+                                // Sort by HGVS C as primary and HGVS P as secondary
+                                aValue = (a['ANN[0].HGVS_C'] || '') + (a['ANN[0].HGVS_P'] || '');
+                                bValue = (b['ANN[0].HGVS_C'] || '') + (b['ANN[0].HGVS_P'] || '');
                                 break;
                                 
                             case 'clinvar':
@@ -1959,7 +2292,6 @@ def generate_html(file_path, output_path=None):
             }});
             
             // Initialize
-            setupColumnToggle();
             renderTable(currentPage);
             renderPagination();
         }});
@@ -1977,17 +2309,18 @@ def generate_html(file_path, output_path=None):
 def main():
     """Main function to run from the command line"""
     if len(sys.argv) < 2:
-        print("Usage: python generate_report.py <input_tsv_file> [output_html_file]")
+        print("Usage: python generate_report.py <input_tsv_file> [output_html_file] [coverage_metrics_file]")
         return
     
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    coverage_metrics_file = sys.argv[3] if len(sys.argv) > 3 else None
     
     if not os.path.exists(input_file):
         print(f"Error: Input file '{input_file}' not found")
         return
     
-    result = generate_html(input_file, output_file)
+    result = generate_html(input_file, output_file, coverage_metrics_file)
     if result:
         print("Report generation completed successfully!")
     else:
@@ -1995,3 +2328,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+                   
